@@ -10,8 +10,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getMockGradeReports, getMockAssignments, getMockSubjects } from '@/lib/placeholder-data';
-import type { GradeReportEntry, Assignment, Subject as SubjectType } from '@/types'; // Renamed Subject to SubjectType to avoid conflict
+import { getMockGradeReports, getMockAssignmentsForChild, getMockSubjectsForChild } from '@/lib/placeholder-data';
+import type { GradeReportEntry, ChildAssignmentView, Subject as SubjectType } from '@/types'; // Renamed Subject to SubjectType to avoid conflict
 
 const AcademicAdvisorInputSchema = z.object({
   childId: z.string().describe("The ID of the child for whom advice is being generated."),
@@ -30,8 +30,8 @@ export type AcademicAdvisorOutput = z.infer<typeof AcademicAdvisorOutputSchema>;
 export async function getAcademicAdvice(input: AcademicAdvisorInput): Promise<AcademicAdvisorOutput> {
   // Fetch mock data within the function that calls the flow, to pass to the prompt
   const gradeReports = getMockGradeReports(input.childId);
-  const assignments = getMockAssignments(input.childId).slice(0, 5); // Limit to recent/relevant
-  const subjects = getMockSubjects(input.childId);
+  const assignments = getMockAssignmentsForChild(input.childId).slice(0, 5); // Limit to recent/relevant
+  const subjects = getMockSubjectsForChild(input.childId);
 
   const flowInput = {
     ...input,
@@ -46,7 +46,7 @@ export async function getAcademicAdvice(input: AcademicAdvisorInput): Promise<Ac
 // Define an extended input schema for the prompt that includes the fetched data
 const PromptInputSchema = AcademicAdvisorInputSchema.extend({
     gradeReports: z.array(z.custom<GradeReportEntry>()).describe("Array of grade report entries for the child."),
-    assignments: z.array(z.custom<Assignment>()).describe("Array of assignment details for the child."),
+    assignments: z.array(z.custom<ChildAssignmentView>()).describe("Array of assignment details for the child."), // Updated to ChildAssignmentView
     subjects: z.array(z.custom<SubjectType>()).describe("Array of subject progress details for the child.")
 });
 
@@ -70,7 +70,7 @@ No grade reports available.
 Recent Assignments:
 {{#if assignments.length}}
 {{#each assignments}}
-- Subject: {{this.subject}}, Title: "{{this.title}}", Due: {{this.dueDate}}, Submitted: {{this.submitted}}{{#if this.grade}}, Grade: {{this.grade}}{{else}}{{^if this.submitted}} (Pending Submission){{/if}}{{/if}}
+- Subject: {{this.subjectName}}, Title: "{{this.title}}", Due: {{this.dueDate}}, Submitted: {{this.submitted}}{{#if this.grade}}, Grade: {{this.grade}}{{else}}{{^if this.submitted}} (Pending Submission){{/if}}{{/if}}
 {{/each}}
 {{else}}
 No recent assignments available.
@@ -112,3 +112,4 @@ const academicAdvisorFlow = ai.defineFlow(
     return output;
   }
 );
+
