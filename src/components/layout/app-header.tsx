@@ -64,7 +64,7 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint}/>
+            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint || "user avatar"} />
             <AvatarFallback>{user.name ? user.name.substring(0, 1) : 'U'}</AvatarFallback>
           </Avatar>
         </Button>
@@ -72,19 +72,16 @@ function UserMenu() {
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <Link href="/profile" passHref>
-          <DropdownMenuItem asChild>
-            <a>Profile</a>
-          </DropdownMenuItem>
-        </Link>
-        <Link href="/settings" passHref>
-          <DropdownMenuItem asChild>
-            <a>Settings</a>
-          </DropdownMenuItem>
-        </Link>
+        <DropdownMenuItem asChild>
+          <Link href="/profile">Profile</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/settings">Settings</Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+
