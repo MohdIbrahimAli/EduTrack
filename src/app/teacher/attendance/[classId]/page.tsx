@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useContext } from 'react';
@@ -5,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MOCK_CLASSES, getMockChildById, addOrUpdateMockAttendanceRecord } from '@/lib/placeholder-data';
+import { MOCK_CLASSES, getMockChildById, addOrUpdateMockAttendanceRecord, ALL_MOCK_ATTENDANCE_RECORDS } from '@/lib/placeholder-data';
 import type { Child, AttendanceRecord, SchoolClass } from '@/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Input as ShadcnInput } from '@/components/ui/input'; // Renamed to avoid conflict
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UserX, CalendarDays, Loader2 } from 'lucide-react';
@@ -42,25 +43,38 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
 
 
   useEffect(() => {
-    if (schoolClass) {
-      const initialAttendance: Record<string, AttendanceRecord['status']> = {};
-      // Fetch existing records for the date to prefill
-      const existingRecordsForDate = schoolClass.studentIds.map(studentId => 
-        addOrUpdateMockAttendanceRecord // This needs to be a GETTER now
-        // For now, we default to present
-        // MOCK_ATTENDANCE_RECORDS.find(r => r.childId === studentId && r.date === selectedDate)
-        null // placeholder - logic for fetching initial state for selected date will be more complex
-      );
+    if (schoolClass && selectedDate) { // Ensure selectedDate is defined
+      const newAttendanceData: Record<string, AttendanceRecord['status']> = {};
+      const newNotesData: Record<string, string> = {};
 
-      schoolClass.studentIds.forEach(id => {
-        // const studentRecord = existingRecordsForDate.find(r => r?.childId === id);
-        // initialAttendance[id] = studentRecord?.status || 'Present';
-        // if(studentRecord?.notes) notesData[id] = studentRecord.notes;
-        initialAttendance[id] = 'Present'; // Default to present
+      schoolClass.studentIds.forEach(studentId => {
+        const recordForDate = ALL_MOCK_ATTENDANCE_RECORDS.find(
+          r => r.childId === studentId && r.date === selectedDate
+        );
+
+        if (recordForDate) {
+          newAttendanceData[studentId] = recordForDate.status;
+          newNotesData[studentId] = recordForDate.notes || '';
+        } else {
+          // Default to 'Present' if no record exists for the selected date
+          newAttendanceData[studentId] = 'Present';
+          newNotesData[studentId] = '';
+        }
       });
-      setAttendanceData(initialAttendance);
-      setNotesData({}); // Reset notes for new date
+
+      setAttendanceData(newAttendanceData);
+      setNotesData(newNotesData);
+    } else if (schoolClass) {
+        // If selectedDate is not yet set (e.g., on initial load before date is fully initialized)
+        // or if only schoolClass is available, set defaults.
+        const defaultAttendance: Record<string, AttendanceRecord['status']> = {};
+        schoolClass.studentIds.forEach(id => {
+            defaultAttendance[id] = 'Present';
+        });
+        setAttendanceData(defaultAttendance);
+        setNotesData({});
     }
+    // If !schoolClass, data will remain empty, which is fine until schoolClass loads.
   }, [selectedDate, schoolClass]);
 
   if (!context || context.isLoadingRole) {
@@ -103,11 +117,22 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
       for (const student of studentsInClass) {
         const status = attendanceData[student.id];
         const notes = notesData[student.id];
-        if (status) { 
-          await saveAttendanceRecord(student.id, selectedDate, status, notes, currentUser.id);
-        }
+        // Ensure status is always defined by defaulting it if somehow missing, though UI should prevent this state.
+        const currentStatus = status || 'Present'; 
+        await saveAttendanceRecord(student.id, selectedDate, currentStatus, notes, currentUser.id);
       }
       toast({ title: "Success", description: `Attendance for ${selectedDate} submitted.` });
+       // After successful submission, refresh local state to reflect any changes made by saveAttendanceRecord
+      // (e.g. if saveAttendanceRecord modifies ALL_MOCK_ATTENDANCE_RECORDS which then affects child.absenceCountThisMonth)
+      // This re-triggers the useEffect that reads from ALL_MOCK_ATTENDANCE_RECORDS
+       setSelectedDate(currentSelectedDate => { // Force re-evaluation of useEffect
+         const temp = currentSelectedDate;
+         // A tiny delay or change might be needed if state update is too fast
+         // but usually, just setting it to itself or a new Date object for the same day works.
+         return format(parseISO(temp), 'yyyy-MM-dd'); 
+       });
+
+
     } catch (error) {
       toast({ title: "Error", description: "Failed to submit attendance.", variant: "destructive" });
       console.error("Failed to submit attendance", error);
@@ -123,7 +148,7 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-primary">Manage Attendance for {schoolClass.name}</CardTitle>
           <CardDescription>
-            Mark attendance for students on {format(new Date(selectedDate.replace(/-/g, '/')), 'MMMM dd, yyyy')}.
+            Mark attendance for students on {selectedDate ? format(parseISO(selectedDate), 'MMMM dd, yyyy') : 'N/A'}.
           </CardDescription>
           <Link href="/teacher/dashboard">
             <Button variant="link" className="text-accent p-0">&larr; Back to Dashboard</Button>
@@ -186,3 +211,4 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
     </div>
   );
 }
+

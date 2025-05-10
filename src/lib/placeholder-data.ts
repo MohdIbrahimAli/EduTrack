@@ -1,3 +1,4 @@
+
 import type { User, Child, AttendanceRecord, SchoolNotification, Subject, Assignment, GradeReportEntry, Conversation, Message, SchoolClass, AssignmentSubmission, ChildAssignmentView } from '@/types';
 import { format, subDays, addDays, startOfMonth, parseISO } from 'date-fns';
 
@@ -44,15 +45,15 @@ export let MOCK_CHILDREN: Child[] = [
 
 // --- SUBJECTS ---
 export let MOCK_SUBJECTS: Subject[] = [
-  { id: 'subjMath5', name: 'Mathematics - Grade 5', progress: 75, currentTopic: 'Algebra Basics', nextDeadline: format(addDays(new Date(), 7), 'yyyy-MM-dd'), teacherId: TEACHER_MOCK_USER.id, classId: 'classGrade5A' },
-  { id: 'subjSci5', name: 'Science - Grade 5', progress: 60, currentTopic: 'Photosynthesis', nextDeadline: format(addDays(new Date(), 10), 'yyyy-MM-dd'), teacherId: TEACHER_MOCK_USER.id, classId: 'classGrade5A' },
-  { id: 'subjEng3', name: 'English - Grade 3', progress: 85, currentTopic: 'Story Writing', teacherId: OTHER_TEACHER_MOCK_USER.id, classId: 'classGrade3B' },
-  { id: 'subjHist5', name: 'History - Grade 5', progress: 50, currentTopic: 'Ancient Civilizations', nextDeadline: format(addDays(new Date(), 14), 'yyyy-MM-dd'), teacherId: TEACHER_MOCK_USER.id, classId: 'classGrade5A' },
+  { id: 'subjMath5', name: 'Mathematics - Grade 5', progress: 75, currentTopic: 'Algebra Basics', nextDeadline: format(addDays(new Date(), 7), 'yyyy-MM-dd'), teacherId: TEACHER_MOCK_USER.id, classId: 'classGrade5A', teacherName: TEACHER_MOCK_USER.name },
+  { id: 'subjSci5', name: 'Science - Grade 5', progress: 60, currentTopic: 'Photosynthesis', nextDeadline: format(addDays(new Date(), 10), 'yyyy-MM-dd'), teacherId: TEACHER_MOCK_USER.id, classId: 'classGrade5A', teacherName: TEACHER_MOCK_USER.name },
+  { id: 'subjEng3', name: 'English - Grade 3', progress: 85, currentTopic: 'Story Writing', teacherId: OTHER_TEACHER_MOCK_USER.id, classId: 'classGrade3B', teacherName: OTHER_TEACHER_MOCK_USER.name },
+  { id: 'subjHist5', name: 'History - Grade 5', progress: 50, currentTopic: 'Ancient Civilizations', nextDeadline: format(addDays(new Date(), 14), 'yyyy-MM-dd'), teacherId: TEACHER_MOCK_USER.id, classId: 'classGrade5A', teacherName: TEACHER_MOCK_USER.name },
 ];
 
 
 // --- ATTENDANCE RECORDS ---
-let ALL_MOCK_ATTENDANCE_RECORDS: AttendanceRecord[] = [
+export let ALL_MOCK_ATTENDANCE_RECORDS: AttendanceRecord[] = [
     { id: 'att1-child1', childId: 'child1', date: format(new Date(), 'yyyy-MM-dd'), status: 'Present', markedBy: TEACHER_MOCK_USER.id },
     { id: 'att2-child1', childId: 'child1', date: format(subDays(new Date(),1), 'yyyy-MM-dd'), status: 'Present', markedBy: TEACHER_MOCK_USER.id },
     { id: 'att3-child1', childId: 'child1', date: format(subDays(new Date(),2), 'yyyy-MM-dd'), status: 'Late', notes: 'Arrived 10 mins late.', markedBy: TEACHER_MOCK_USER.id },
@@ -74,23 +75,16 @@ export function addOrUpdateMockAttendanceRecord(childId: string, date: string, s
     record => record.childId === childId && record.date === date
   );
 
-  const child = getMockChildById(childId);
-  if (child && date === format(new Date(), 'yyyy-MM-dd')) {
-    child.currentAttendanceStatus = status;
-    // Crude update to absenceCountThisMonth for demo
-    if (status === 'Absent' || status === 'Late') {
-         const monthStart = startOfMonth(new Date());
-         const absencesThisMonth = ALL_MOCK_ATTENDANCE_RECORDS.filter(r => r.childId === childId && (r.status === 'Absent' || r.status === 'Late') && parseISO(r.date) >= monthStart).length;
-         child.absenceCountThisMonth = absencesThisMonth + (existingRecordIndex === -1 ? 1 : 0); // Add 1 if it's a new absence today
-    }
-  }
-
+  const child = MOCK_CHILDREN.find(c => c.id === childId); // Find child to update their status
+  let isNewAbsenceToday = false;
 
   if (existingRecordIndex > -1) {
+    // If record exists and is being changed to absent/late, or from absent/late
+    const oldStatus = ALL_MOCK_ATTENDANCE_RECORDS[existingRecordIndex].status;
     ALL_MOCK_ATTENDANCE_RECORDS[existingRecordIndex] = {
       ...ALL_MOCK_ATTENDANCE_RECORDS[existingRecordIndex],
       status,
-      notes: notes || ALL_MOCK_ATTENDANCE_RECORDS[existingRecordIndex].notes,
+      notes: notes || ALL_MOCK_ATTENDANCE_RECORDS[existingRecordIndex].notes, // Keep old notes if new ones not provided
       markedBy: markedBy || ALL_MOCK_ATTENDANCE_RECORDS[existingRecordIndex].markedBy,
     };
   } else {
@@ -103,6 +97,27 @@ export function addOrUpdateMockAttendanceRecord(childId: string, date: string, s
       markedBy: markedBy || 'teacherUnknown',
     };
     ALL_MOCK_ATTENDANCE_RECORDS.push(newRecord);
+    if (status === 'Absent' || status === 'Late') {
+      isNewAbsenceToday = true;
+    }
+  }
+
+  // Update child's currentAttendanceStatus and absenceCountThisMonth
+  if (child) {
+    if (date === format(new Date(), 'yyyy-MM-dd')) { // Only update current status for today's date
+      child.currentAttendanceStatus = status;
+    }
+
+    // Recalculate absenceCountThisMonth
+    const monthStart = startOfMonth(parseISO(date)); // Use the month of the record being changed/added
+    const monthEnd = addDays(startOfMonth(parseISO(date)), 30); // Approx end of month for filtering
+    
+    const absencesThisMonth = ALL_MOCK_ATTENDANCE_RECORDS.filter(r => 
+      r.childId === childId && 
+      (r.status === 'Absent' || r.status === 'Late') && 
+      parseISO(r.date) >= monthStart && parseISO(r.date) <= monthEnd
+    ).length;
+    child.absenceCountThisMonth = absencesThisMonth;
   }
 }
 
@@ -195,10 +210,10 @@ export function addOrUpdateMockAssignmentSubmission(submissionData: Partial<Assi
 
 // --- GRADE REPORTS ---
 let MOCK_GRADE_REPORTS: GradeReportEntry[] = [
-  { id: 'gr1-child1', studentId: 'child1', subjectId: 'subjMath5', grade: 'A', teacherFeedback: 'Excellent understanding of concepts. Keep up the great work!', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
-  { id: 'gr2-child1', studentId: 'child1', subjectId: 'subjSci5', grade: 'B+', teacherFeedback: 'Good effort, needs to focus more on practical applications.', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
-  { id: 'gr1-child2', studentId: 'child2', subjectId: 'subjEng3', grade: 'A-', teacherFeedback: 'Mia is a diligent student and participates well.', term: 'Term 1', issuedBy: OTHER_TEACHER_MOCK_USER.id },
-  { id: 'gr1-child3', studentId: 'child3', subjectId: 'subjMath5', grade: 'B', teacherFeedback: 'Ethan shows good potential but needs more practice.', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
+  { id: 'gr1-child1', studentId: 'child1', subjectId: 'subjMath5', subject: 'Mathematics - Grade 5', grade: 'A', teacherFeedback: 'Excellent understanding of concepts. Keep up the great work!', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
+  { id: 'gr2-child1', studentId: 'child1', subjectId: 'subjSci5', subject: 'Science - Grade 5', grade: 'B+', teacherFeedback: 'Good effort, needs to focus more on practical applications.', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
+  { id: 'gr1-child2', studentId: 'child2', subjectId: 'subjEng3', subject: 'English - Grade 3', grade: 'A-', teacherFeedback: 'Mia is a diligent student and participates well.', term: 'Term 1', issuedBy: OTHER_TEACHER_MOCK_USER.id },
+  { id: 'gr1-child3', studentId: 'child3', subjectId: 'subjMath5', subject: 'Mathematics - Grade 5', grade: 'B', teacherFeedback: 'Ethan shows good potential but needs more practice.', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
 ];
 
 export const getMockGradeReports = (studentId: string): GradeReportEntry[] => {
@@ -207,28 +222,27 @@ export const getMockGradeReports = (studentId: string): GradeReportEntry[] => {
 
 export function addOrUpdateMockGradeEntry(studentId: string, entry: Omit<GradeReportEntry, 'id' | 'issuedBy' | 'studentId'> & { id?: string }, teacherId: string): GradeReportEntry {
     let savedEntry: GradeReportEntry;
+    const subjectName = MOCK_SUBJECTS.find(s => s.id === entry.subjectId)?.name || 'Unknown Subject';
     if (entry.id) { // Editing
         const index = MOCK_GRADE_REPORTS.findIndex(g => g.id === entry.id && g.studentId === studentId);
         if (index > -1) {
-            savedEntry = { ...MOCK_GRADE_REPORTS[index], ...entry, studentId, issuedBy: teacherId };
+            savedEntry = { ...MOCK_GRADE_REPORTS[index], ...entry, subject: subjectName, studentId, issuedBy: teacherId };
             MOCK_GRADE_REPORTS[index] = savedEntry;
         } else {
             const newId = `grade-${Date.now()}`;
-            savedEntry = { ...entry, id: newId, studentId, issuedBy: teacherId } as GradeReportEntry;
+            savedEntry = { ...entry, id: newId, subject: subjectName, studentId, issuedBy: teacherId } as GradeReportEntry;
             MOCK_GRADE_REPORTS.push(savedEntry);
         }
     } else { // Creating
         const newId = `grade-${Date.now()}`;
-        savedEntry = { ...entry, id: newId, studentId, issuedBy: teacherId } as GradeReportEntry;
+        savedEntry = { ...entry, id: newId, subject: subjectName, studentId, issuedBy: teacherId } as GradeReportEntry;
         MOCK_GRADE_REPORTS.push(savedEntry);
     }
     return {...savedEntry};
 }
 
 // --- MESSAGES & CONVERSATIONS ---
-// Assuming messages are mostly static for now or handled by a more complex system if real-time chat is needed.
-// For simplicity, MOCK_CONVERSATIONS will remain as is unless specific update functions are requested.
-export const MOCK_CONVERSATIONS: Conversation[] = [
+export let MOCK_CONVERSATIONS: Conversation[] = [
   {
     id: 'convParentTeacher1',
     participantIds: [PARENT_MOCK_USER.id, TEACHER_MOCK_USER.id],
@@ -238,11 +252,26 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
     },
     lastMessagePreview: 'Yes, Alex can get an extension on the homework.',
     lastMessageTimestamp: subDays(new Date(),1).toISOString(),
-    unreadCounts: { [PARENT_MOCK_USER.id]: 1, [TEACHER_MOCK_USER.id]: 0 },
+    unreadCount:  1 , // Simplified: unread count for current parent user viewing this teacher.
     messages: [
       { id: 'msg1', conversationId: 'convParentTeacher1', senderId: TEACHER_MOCK_USER.id, senderName: TEACHER_MOCK_USER.name, avatarUrl: TEACHER_MOCK_USER.avatarUrl, dataAiHint: TEACHER_MOCK_USER.dataAiHint, timestamp: subDays(new Date(),1).toISOString(), text: 'Hello, I wanted to discuss Alex\'s progress.', isOwnMessage: false },
       { id: 'msg2', conversationId: 'convParentTeacher1', senderId: PARENT_MOCK_USER.id, senderName: PARENT_MOCK_USER.name, avatarUrl: PARENT_MOCK_USER.avatarUrl, dataAiHint: PARENT_MOCK_USER.dataAiHint, timestamp: subDays(new Date(),1).toISOString(), text: 'Hi Mr. Smith, sure. Also, could Alex get an extension for the math homework due tomorrow?', isOwnMessage: true },
       { id: 'msg3', conversationId: 'convParentTeacher1', senderId: TEACHER_MOCK_USER.id, senderName: TEACHER_MOCK_USER.name, avatarUrl: TEACHER_MOCK_USER.avatarUrl, dataAiHint: TEACHER_MOCK_USER.dataAiHint, timestamp: subDays(new Date(),1).toISOString(), text: 'Yes, Alex can get an extension on the homework. Please submit it by Friday.', isOwnMessage: false },
+    ],
+  },
+    {
+    id: 'convParentTeacher2',
+    participantIds: [PARENT_MOCK_USER.id, OTHER_TEACHER_MOCK_USER.id],
+    participantDetails: {
+        [PARENT_MOCK_USER.id]: { name: PARENT_MOCK_USER.name, avatarUrl: PARENT_MOCK_USER.avatarUrl, role: 'parent' },
+        [OTHER_TEACHER_MOCK_USER.id]: { name: OTHER_TEACHER_MOCK_USER.name, avatarUrl: OTHER_TEACHER_MOCK_USER.avatarUrl, role: 'teacher' },
+    },
+    lastMessagePreview: 'Sure, let\'s discuss Mia\'s project.',
+    lastMessageTimestamp: subDays(new Date(),2).toISOString(),
+    unreadCount: 0,
+    messages: [
+      { id: 'msgOther1', conversationId: 'convParentTeacher2', senderId: PARENT_MOCK_USER.id, senderName: PARENT_MOCK_USER.name, avatarUrl: PARENT_MOCK_USER.avatarUrl, dataAiHint: PARENT_MOCK_USER.dataAiHint, timestamp: subDays(new Date(),2).toISOString(), text: 'Hi Ms. Green, I have a question about Mia\'s upcoming project.', isOwnMessage: true },
+      { id: 'msgOther2', conversationId: 'convParentTeacher2', senderId: OTHER_TEACHER_MOCK_USER.id, senderName: OTHER_TEACHER_MOCK_USER.name, avatarUrl: OTHER_TEACHER_MOCK_USER.avatarUrl, dataAiHint: OTHER_TEACHER_MOCK_USER.dataAiHint, timestamp: subDays(new Date(),2).toISOString(), text: 'Sure, let\'s discuss Mia\'s project.', isOwnMessage: false },
     ],
   },
 ];
@@ -268,7 +297,7 @@ export const getMockClassesForTeacher = (teacherId: string): SchoolClass[] => {
 };
 
 export const getMockAssignmentsForClass = (classId: string): Assignment[] => {
-    return MOCK_ASSIGNMENTS_CLASS.filter(a => a.classId === classId).map(a => ({...a}));
+    return MOCK_ASSIGNMENTS_CLASS.filter(a => a.classId === classId).map(a => ({...a})).sort((a,b) => parseISO(b.dueDate).getTime() - parseISO(a.dueDate).getTime());
 };
 
 export const getMockAssignmentsForChild = (childId: string): ChildAssignmentView[] => {
@@ -277,7 +306,7 @@ export const getMockAssignmentsForChild = (childId: string): ChildAssignmentView
     return [];
   }
 
-  const classAssignments = getMockAssignmentsForClass(child.classId); // Gets copies
+  const classAssignments = getMockAssignmentsForClass(child.classId); // Gets copies, already sorted
   const childSubmissions = MOCK_ASSIGNMENT_SUBMISSIONS.filter(sub => sub.studentId === childId).map(s => ({...s}));
 
   return classAssignments.map(classAssign => {
@@ -285,7 +314,7 @@ export const getMockAssignmentsForChild = (childId: string): ChildAssignmentView
     const subjectDetails = MOCK_SUBJECTS.find(s => s.id === classAssign.subjectId);
 
     return {
-      ...classAssign, // This is already a copy
+      ...classAssign, 
       subjectName: subjectDetails?.name || 'Unknown Subject',
       submitted: submission?.isSubmitted || false,
       grade: submission?.grade,
