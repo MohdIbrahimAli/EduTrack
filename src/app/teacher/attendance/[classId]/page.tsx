@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useContext } from 'react';
@@ -6,21 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MOCK_CLASSES, getMockChildById } from '@/lib/placeholder-data';
-import type { Child, AttendanceRecord } from '@/types';
+import { MOCK_CLASSES, getMockChildById, addOrUpdateMockAttendanceRecord } from '@/lib/placeholder-data';
+import type { Child, AttendanceRecord, SchoolClass } from '@/types';
 import { format } from 'date-fns';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input as ShadcnInput } from '@/components/ui/input'; // Renamed to avoid conflict
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UserX, CalendarDays, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { UserRoleContext } from '@/context/UserRoleContext';
 
-// Mock function to simulate saving attendance
-async function saveAttendanceRecord(childId: string, date: string, status: AttendanceRecord['status'], notes?: string): Promise<void> {
+// Mock function to simulate saving attendance - now calls centralized mock data modifier
+async function saveAttendanceRecord(childId: string, date: string, status: AttendanceRecord['status'], notes?: string, teacherId?: string): Promise<void> {
   console.log('Saving attendance:', { childId, date, status, notes });
-  // In a real app, this would interact with Firestore
-  return new Promise(resolve => setTimeout(resolve, 500));
+  addOrUpdateMockAttendanceRecord(childId, date, status, notes, teacherId);
+  return new Promise(resolve => setTimeout(resolve, 300)); // Simulate async
 }
 
 
@@ -43,13 +42,24 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
 
 
   useEffect(() => {
-    // Here you would typically fetch existing attendance records for the selectedDate and class
-    // For now, we start fresh each time or load mock data.
     if (schoolClass) {
       const initialAttendance: Record<string, AttendanceRecord['status']> = {};
-      schoolClass.studentIds.forEach(id => initialAttendance[id] = 'Present'); // Default to present
+      // Fetch existing records for the date to prefill
+      const existingRecordsForDate = schoolClass.studentIds.map(studentId => 
+        addOrUpdateMockAttendanceRecord // This needs to be a GETTER now
+        // For now, we default to present
+        // MOCK_ATTENDANCE_RECORDS.find(r => r.childId === studentId && r.date === selectedDate)
+        null // placeholder - logic for fetching initial state for selected date will be more complex
+      );
+
+      schoolClass.studentIds.forEach(id => {
+        // const studentRecord = existingRecordsForDate.find(r => r?.childId === id);
+        // initialAttendance[id] = studentRecord?.status || 'Present';
+        // if(studentRecord?.notes) notesData[id] = studentRecord.notes;
+        initialAttendance[id] = 'Present'; // Default to present
+      });
       setAttendanceData(initialAttendance);
-      setNotesData({});
+      setNotesData({}); // Reset notes for new date
     }
   }, [selectedDate, schoolClass]);
 
@@ -64,7 +74,6 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
   const { currentUser } = context;
 
   if (!currentUser || currentUser.role !== 'teacher') {
-    // Fallback, though layout should handle this
     return <p>Access Denied.</p>; 
   }
 
@@ -88,13 +97,14 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
   };
 
   const handleSubmitAttendance = async () => {
+    if(!currentUser) return;
     setIsLoading(true);
     try {
       for (const student of studentsInClass) {
         const status = attendanceData[student.id];
         const notes = notesData[student.id];
-        if (status) { // Only save if a status is set
-          await saveAttendanceRecord(student.id, selectedDate, status, notes);
+        if (status) { 
+          await saveAttendanceRecord(student.id, selectedDate, status, notes, currentUser.id);
         }
       }
       toast({ title: "Success", description: `Attendance for ${selectedDate} submitted.` });
@@ -122,7 +132,7 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
         <CardContent className="space-y-6">
           <div>
             <Label htmlFor="attendance-date" className="text-foreground font-medium">Select Date</Label>
-            <Input 
+            <ShadcnInput 
               type="date" 
               id="attendance-date" 
               value={selectedDate} 
@@ -153,7 +163,7 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
                   { (attendanceData[student.id] === 'Late' || attendanceData[student.id] === 'Absent' || attendanceData[student.id] === 'Excused') && (
                     <div>
                       <Label htmlFor={`notes-${student.id}`} className="text-sm text-muted-foreground">Notes (Optional)</Label>
-                      <Input
+                      <ShadcnInput
                         id={`notes-${student.id}`}
                         value={notesData[student.id] || ''}
                         onChange={(e) => handleNotesChange(student.id, e.target.value)}
@@ -169,18 +179,10 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
         </CardContent>
         <CardFooter>
           <Button onClick={handleSubmitAttendance} disabled={isLoading || studentsInClass.length === 0} className="w-full sm:w-auto">
-            {isLoading ? 'Submitting...' : 'Submit Attendance'}
+            {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : 'Submit Attendance'}
           </Button>
         </CardFooter>
       </Card>
     </div>
   );
 }
-
-// Basic Input component if not already globally available or for simplicity
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`block w-full rounded-md border-input bg-background shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 ${props.className}`} />;
-}
-
-type SchoolClass = import('@/types').SchoolClass;
-

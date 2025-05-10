@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useContext } from 'react';
@@ -7,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input'; 
 import { Textarea } from '@/components/ui/textarea'; 
-import { MOCK_CLASSES, getMockAssignmentsForClass, MOCK_SUBJECTS } from '@/lib/placeholder-data';
-import type { SchoolClass, Assignment, AssignmentSubmission, Subject as SubjectType } from '@/types';
+import { MOCK_CLASSES, getMockAssignmentsForClass, MOCK_SUBJECTS, addOrUpdateMockAssignment, deleteMockAssignment } from '@/lib/placeholder-data';
+import type { SchoolClass, Assignment, Subject as SubjectType } from '@/types';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UserX, PlusCircle, Edit, Trash2, Eye, Loader2 } from 'lucide-react';
@@ -28,14 +27,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { UserRoleContext } from '@/context/UserRoleContext';
 
 
+// Updated to use centralized mock data modifier
 async function saveAssignment(classId: string, assignment: Omit<Assignment, 'id' | 'createdBy'> & { id?: string }, teacherId: string): Promise<Assignment> {
   console.log('Saving assignment:', { classId, assignment });
-  const newId = assignment.id || `assignNew-${Date.now()}`;
-  return { ...assignment, id: newId, createdBy: teacherId } as Assignment;
+  const saved = addOrUpdateMockAssignment(classId, assignment, teacherId);
+  return new Promise(resolve => setTimeout(() => resolve(saved), 300));
 }
-async function deleteAssignment(assignmentId: string): Promise<void> {
+
+// Updated to use centralized mock data modifier
+async function removeAssignment(assignmentId: string): Promise<boolean> {
   console.log('Deleting assignment:', assignmentId);
-  return new Promise(resolve => setTimeout(resolve, 300));
+  const success = deleteMockAssignment(assignmentId);
+  return new Promise(resolve => setTimeout(() => resolve(success), 300));
 }
 
 
@@ -62,7 +65,6 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
       }
       setIsLoadingPage(false);
     } else if (context && !context.isLoadingRole) {
-      // Not a teacher or no user
       setIsLoadingPage(false);
     }
   }, [context, params.classId]);
@@ -85,6 +87,12 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
     return <div className="container mx-auto py-8"><Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle><AlertDescription>This class may not exist or you may not have permission to manage it.</AlertDescription></Alert></div>;
   }
 
+  const fetchAssignmentsForClass = () => {
+     if(schoolClass) {
+        setAssignments(getMockAssignmentsForClass(schoolClass.id));
+     }
+  }
+
 
   const handleOpenForm = (assignment?: Assignment) => {
     setCurrentAssignment(assignment || { title: '', description: '', dueDate: format(new Date(), 'yyyy-MM-dd'), subjectId: subjectsForClass[0]?.id || '' });
@@ -93,20 +101,15 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
 
   const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!currentAssignment || !currentAssignment.title || !currentAssignment.subjectId || !currentAssignment.dueDate) {
+    if (!currentAssignment || !currentAssignment.title || !currentAssignment.subjectId || !currentAssignment.dueDate || !schoolClass) {
       toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
     setIsLoadingForm(true);
     try {
       const savedAssignment = await saveAssignment(schoolClass.id, currentAssignment as any, currentUser.id);
-      if (currentAssignment.id) { // Editing
-        setAssignments(prev => prev.map(a => a.id === savedAssignment.id ? savedAssignment : a));
-        toast({ title: "Success", description: "Assignment updated." });
-      } else { // Creating
-        setAssignments(prev => [savedAssignment, ...prev ]); // Add to beginning of list
-        toast({ title: "Success", description: "Assignment created." });
-      }
+      fetchAssignmentsForClass(); // Re-fetch to update list
+      toast({ title: "Success", description: `Assignment ${currentAssignment.id ? 'updated' : 'created'}.` });
       setIsFormOpen(false);
       setCurrentAssignment(null);
     } catch (error) {
@@ -117,7 +120,6 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
   };
   
   const handleDeleteAssignment = async (assignmentId: string) => {
-     // Consider using AlertDialog for confirmation
     const confirmDelete = await new Promise<boolean>((resolve) => {
         // This is a placeholder for a proper confirmation dialog.
         // In a real app, use <AlertDialog> from shadcn/ui.
@@ -126,11 +128,15 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
 
     if (!confirmDelete) return;
 
-    setIsLoadingForm(true); // Can use a general loading state for the page as well
+    setIsLoadingForm(true);
     try {
-      await deleteAssignment(assignmentId);
-      setAssignments(prev => prev.filter(a => a.id !== assignmentId));
-      toast({ title: "Success", description: "Assignment deleted." });
+      const success = await removeAssignment(assignmentId);
+      if (success) {
+        fetchAssignmentsForClass(); // Re-fetch to update list
+        toast({ title: "Success", description: "Assignment deleted." });
+      } else {
+        toast({ title: "Error", description: "Assignment not found or already deleted.", variant: "destructive" });
+      }
     } catch (error) {
       toast({ title: "Error", description: "Failed to delete assignment.", variant: "destructive" });
     } finally {
@@ -204,7 +210,7 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
                  <Select
                     value={currentAssignment?.subjectId || ''}
                     onValueChange={(value) => setCurrentAssignment(p => ({ ...p, subjectId: value }))}
-                    required
+                    // required - Handled in submit validation
                   >
                     <SelectTrigger id="subjectId"><SelectValue placeholder="Select subject" /></SelectTrigger>
                     <SelectContent>

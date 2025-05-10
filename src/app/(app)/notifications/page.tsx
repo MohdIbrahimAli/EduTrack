@@ -1,9 +1,12 @@
+'use client'; // This page is interactive, so client component
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_NOTIFICATIONS } from "@/lib/placeholder-data";
+import { MOCK_NOTIFICATIONS } from "@/lib/placeholder-data"; // MOCK_NOTIFICATIONS is now 'let'
 import type { SchoolNotification } from "@/types";
-import { Bell, AlertTriangle, Info, CheckCircle } from "lucide-react";
+import { Bell, AlertTriangle, Info, CheckCircle, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 
 function NotificationIcon({ type }: { type: SchoolNotification['type'] }) {
   switch (type) {
@@ -19,14 +22,33 @@ function NotificationIcon({ type }: { type: SchoolNotification['type'] }) {
 }
 
 export default function NotificationsPage() {
-  const sortedNotifications = [...MOCK_NOTIFICATIONS].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  const [notifications, setNotifications] = useState<SchoolNotification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    // Simulate fetching/re-fetching notifications. MOCK_NOTIFICATIONS is now mutable.
+    // Sorting is done here to ensure the latest view of the data.
+    const sorted = [...MOCK_NOTIFICATIONS].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+    setNotifications(sorted.map(n => ({...n}))); // Create copies
+    setIsLoading(false);
+  }, []); // Could add a dependency to re-fetch if needed, e.g., context update
+
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-8 text-primary">Notifications</h1>
-      {sortedNotifications.length > 0 ? (
+      {notifications.length > 0 ? (
         <div className="space-y-6">
-          {sortedNotifications.map((notification) => (
+          {notifications.map((notification) => (
             <Card key={notification.id} className={`shadow-lg rounded-lg overflow-hidden ${notification.read ? 'opacity-70 bg-muted/30' : 'bg-card'}`}>
               <CardHeader className="p-4">
                 <div className="flex items-start justify-between">

@@ -1,15 +1,39 @@
+'use client'; // This page is interactive, so client component
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getMockAttendanceRecords, getMockChildById } from "@/lib/placeholder-data";
 import { AttendanceCalendarView } from "@/components/attendance/attendance-calendar-view";
 import { AttendanceDailyView } from "@/components/attendance/attendance-daily-view";
 import { AttendanceMonthlySummary } from "@/components/attendance/attendance-monthly-summary";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UserX } from "lucide-react";
+import { UserX, Loader2 } from "lucide-react";
+import type { Child, AttendanceRecord as AttendanceRecordType } from "@/types";
+import { useState, useEffect } from "react";
 
 export default function AttendancePage({ params }: { params: { childId: string } }) {
-  const child = getMockChildById(params.childId);
+  const [child, setChild] = useState<Child | null | undefined>(undefined); // undefined for initial loading state
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecordType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const foundChild = getMockChildById(params.childId);
+    setChild(foundChild); // This can be null if not found
+    if (foundChild) {
+      setAttendanceRecords(getMockAttendanceRecords(params.childId));
+    }
+    setIsLoading(false);
+  }, [params.childId]); // Re-fetch if childId changes
+
+  if (isLoading || child === undefined) { // Show loader if still loading or child state is initial undefined
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
   
-  if (!child) {
+  if (!child) { // Child is null, meaning not found after attempting to load
     return (
       <div className="container mx-auto py-8">
         <Alert variant="destructive" className="max-w-lg mx-auto">
@@ -23,7 +47,6 @@ export default function AttendancePage({ params }: { params: { childId: string }
     );
   }
 
-  const attendanceRecords = getMockAttendanceRecords(params.childId);
 
   return (
     <div className="container mx-auto py-8">

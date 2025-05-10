@@ -1,13 +1,36 @@
+'use client'; // This page is interactive, so client component
 
 import { getMockAssignmentsForChild, getMockChildById } from "@/lib/placeholder-data";
-import type { ChildAssignmentView } from "@/types";
+import type { Child, ChildAssignmentView } from "@/types";
 import { AssignmentItem } from "@/components/assignments/assignment-item";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UserX } from "lucide-react";
+import { UserX, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export default function AssignmentsPage({ params }: { params: { childId: string } }) {
-  const child = getMockChildById(params.childId);
+  const [child, setChild] = useState<Child | null | undefined>(undefined);
+  const [allAssignments, setAllAssignments] = useState<ChildAssignmentView[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const foundChild = getMockChildById(params.childId);
+    setChild(foundChild);
+    if (foundChild) {
+      setAllAssignments(getMockAssignmentsForChild(params.childId));
+    }
+    setIsLoading(false);
+  }, [params.childId]);
+
+
+  if (isLoading || child === undefined) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
   
   if (!child) {
     return (
@@ -22,8 +45,6 @@ export default function AssignmentsPage({ params }: { params: { childId: string 
       </div>
     );
   }
-
-  const allAssignments: ChildAssignmentView[] = getMockAssignmentsForChild(params.childId);
   
   const upcomingAssignments = allAssignments.filter(a => !a.submitted && new Date(a.dueDate) >= new Date());
   const pastAssignments = allAssignments.filter(a => a.submitted || new Date(a.dueDate) < new Date());

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useContext, useEffect } from 'react';
@@ -8,18 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getMockClassesForTeacher } from '@/lib/placeholder-data';
+import { getMockClassesForTeacher, addMockNotification } from '@/lib/placeholder-data';
 import type { SchoolNotification, SchoolClass } from '@/types';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { UserRoleContext } from '@/context/UserRoleContext';
 
-// Mock function to simulate sending notification
+// Updated to use centralized mock data modifier
 async function sendNotification(notification: Omit<SchoolNotification, 'id' | 'date' | 'read'>): Promise<SchoolNotification> {
   console.log('Sending notification:', notification);
-  // In a real app, this would interact with Firestore (to store) and FCM (to send)
-  return { ...notification, id: `notif-${Date.now()}`, date: new Date().toISOString(), read: false };
+  const newNotification = addMockNotification(notification);
+  return new Promise(resolve => setTimeout(() => resolve(newNotification), 300));
 }
 
 export default function TeacherCreateNotificationPage() {
@@ -29,7 +28,7 @@ export default function TeacherCreateNotificationPage() {
   const [type, setType] = useState<'announcement' | 'alert'>('announcement');
   const [targetAudience, setTargetAudience] = useState<SchoolNotification['targetAudience']>('all');
   const [targetClassId, setTargetClassId] = useState<string | undefined>(undefined);
-  const [isLoadingForm, setIsLoadingForm] = useState(false); // Renamed from isLoading to avoid conflict
+  const [isLoadingForm, setIsLoadingForm] = useState(false); 
   const [teacherClasses, setTeacherClasses] = useState<SchoolClass[]>([]);
 
   const context = useContext(UserRoleContext);
@@ -164,6 +163,7 @@ export default function TeacherCreateNotificationPage() {
                         {teacherClasses.map(c => (
                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                         ))}
+                        {teacherClasses.length === 0 && <SelectItem value="" disabled>No classes available</SelectItem>}
                         </SelectContent>
                     </Select>
                 </div>
