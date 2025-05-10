@@ -8,24 +8,27 @@ import { MOCK_CLASSES, MOCK_CHILDREN, getMockChildById } from "@/lib/placeholder
 import type { Child, SchoolClass } from '@/types';
 import { ArrowRight, BarChart3, ClipboardList, UserX, Loader2 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { useContext, useState, useEffect } from 'react';
+import { use, useContext, useState, useEffect } from 'react'; // Imported 'use'
 import { UserRoleContext } from '@/context/UserRoleContext';
 
-export default function TeacherClassStudentsPage({ params }: { params: { classId: string } }) {
+export default function TeacherClassStudentsPage({ params: paramsPromise }: { params: { classId: string } }) {
+  const params = use(paramsPromise); // Unwrap params
+  const { classId } = params; // Destructure classId from resolved params
+
   const context = useContext(UserRoleContext);
   const [schoolClass, setSchoolClass] = useState<SchoolClass | undefined>(undefined);
   const [studentsInClass, setStudentsInClass] = useState<Child[]>([]);
 
   useEffect(() => {
     if (context && !context.isLoadingRole && context.currentUser && context.currentUser.role === 'teacher') {
-      const foundClass = MOCK_CLASSES.find(c => c.id === params.classId && c.teacherId === context.currentUser!.id);
+      const foundClass = MOCK_CLASSES.find(c => c.id === classId && c.teacherId === context.currentUser!.id);
       setSchoolClass(foundClass);
       if (foundClass) {
         const students = foundClass.studentIds.map(id => getMockChildById(id)).filter(Boolean) as Child[];
         setStudentsInClass(students);
       }
     }
-  }, [context, params.classId]);
+  }, [context, classId, context.isLoadingRole, context.currentUser]); // Use resolved classId and other context dependencies
 
   if (!context || context.isLoadingRole) {
     return (
@@ -38,7 +41,19 @@ export default function TeacherClassStudentsPage({ params }: { params: { classId
   const { currentUser } = context;
 
   if (!currentUser || currentUser.role !== 'teacher') {
-    return <p>Access Denied.</p>;
+    // This case should be handled by layout, but as a fallback
+    return (
+         <div className="container mx-auto py-8">
+            <Alert variant="destructive">
+            <UserX className="h-4 w-4" />
+            <AlertTitle>Access Denied</AlertTitle>
+            <AlertDescription>You do not have permission to view this page.</AlertDescription>
+            </Alert>
+            <Link href="/teacher/dashboard" className="mt-4 inline-block">
+                <Button variant="outline">Back to Dashboard</Button>
+            </Link>
+        </div>
+    );
   }
 
   if (!schoolClass && !context.isLoadingRole) { // Check after loading is complete
@@ -47,7 +62,7 @@ export default function TeacherClassStudentsPage({ params }: { params: { classId
         <Alert variant="destructive">
           <UserX className="h-4 w-4" />
           <AlertTitle>Class Not Found</AlertTitle>
-          <AlertDescription>The class you are trying to access does not exist or you do not have permission to view it.</AlertDescription>
+          <AlertDescription>The class you are trying to access (ID: {classId}) does not exist or you do not have permission to view it.</AlertDescription>
         </Alert>
          <Link href="/teacher/dashboard" className="mt-4 inline-block">
             <Button variant="outline">Back to Dashboard</Button>
@@ -120,3 +135,4 @@ export default function TeacherClassStudentsPage({ params }: { params: { classId
     </div>
   );
 }
+
