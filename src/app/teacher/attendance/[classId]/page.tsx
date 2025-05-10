@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, use } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -24,7 +24,10 @@ async function saveAttendanceRecord(childId: string, date: string, status: Atten
 }
 
 
-export default function TeacherManageAttendancePage({ params }: { params: { classId: string } }) {
+export default function TeacherManageAttendancePage({ params: paramsPromise }: { params: { classId: string } }) {
+  const params = use(paramsPromise);
+  const { classId } = params;
+
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord['status']>>({});
@@ -36,10 +39,10 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
 
   useEffect(() => {
     if (context && !context.isLoadingRole && context.currentUser && context.currentUser.role === 'teacher') {
-      const foundClass = MOCK_CLASSES.find(c => c.id === params.classId && c.teacherId === context.currentUser!.id);
+      const foundClass = MOCK_CLASSES.find(c => c.id === classId && c.teacherId === context.currentUser!.id);
       setSchoolClass(foundClass);
     }
-  }, [context, params.classId]);
+  }, [context, classId]);
 
 
   useEffect(() => {
@@ -92,10 +95,22 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
   }
 
 
-  if (!schoolClass) {
+  if (!schoolClass && !context.isLoadingRole) { // Check after context loading is complete
     return (
       <div className="container mx-auto py-8">
-        <Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle><AlertDescription>This class may not exist or you may not have permission to manage it.</AlertDescription></Alert>
+        <Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle><AlertDescription>This class (ID: {classId}) may not exist or you may not have permission to manage it.</AlertDescription></Alert>
+        <Link href="/teacher/dashboard" className="mt-4 inline-block">
+            <Button variant="outline">Back to Dashboard</Button>
+        </Link>
+      </div>
+    );
+  }
+  
+  if (!schoolClass) { // Still loading class (context loaded but class not yet set)
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-2">Loading class details...</p>
       </div>
     );
   }
