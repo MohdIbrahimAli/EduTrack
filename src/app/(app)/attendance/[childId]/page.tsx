@@ -8,22 +8,25 @@ import { AttendanceMonthlySummary } from "@/components/attendance/attendance-mon
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UserX, Loader2 } from "lucide-react";
 import type { Child, AttendanceRecord as AttendanceRecordType } from "@/types";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react"; // Imported 'use'
 
-export default function AttendancePage({ params }: { params: { childId: string } }) {
+export default function AttendancePage({ params: paramsPromise }: { params: { childId: string } }) {
+  const params = use(paramsPromise); // Unwrap the promise
+  const { childId } = params; // Destructure after unwrapping
+
   const [child, setChild] = useState<Child | null | undefined>(undefined); // undefined for initial loading state
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecordType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
-    const foundChild = getMockChildById(params.childId);
+    const foundChild = getMockChildById(childId); // Use unwrapped childId
     setChild(foundChild); // This can be null if not found
     if (foundChild) {
-      setAttendanceRecords(getMockAttendanceRecords(params.childId));
+      setAttendanceRecords(getMockAttendanceRecords(childId)); // Use unwrapped childId
     }
     setIsLoading(false);
-  }, [params.childId]); // Re-fetch if childId changes
+  }, [childId]); // Re-fetch if childId changes
 
   if (isLoading || child === undefined) { // Show loader if still loading or child state is initial undefined
     return (
@@ -40,7 +43,7 @@ export default function AttendancePage({ params }: { params: { childId: string }
           <UserX className="h-4 w-4" />
           <AlertTitle>Child Not Found</AlertTitle>
           <AlertDescription>
-            The child with ID "{params.childId}" could not be found. Please check the ID or select a child from the dashboard.
+            The child with ID "{childId}" could not be found. Please check the ID or select a child from the dashboard.
           </AlertDescription>
         </Alert>
       </div>
