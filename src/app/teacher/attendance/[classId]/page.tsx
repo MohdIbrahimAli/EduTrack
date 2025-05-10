@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useContext, use } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MOCK_CLASSES, getMockChildById, addOrUpdateMockAttendanceRecord, ALL_MOCK_ATTENDANCE_RECORDS } from '@/lib/placeholder-data';
