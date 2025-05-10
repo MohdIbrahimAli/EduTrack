@@ -1,19 +1,20 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MOCK_LOGGED_IN_USER, MOCK_CLASSES, getMockChildById } from '@/lib/placeholder-data';
+import { MOCK_CLASSES, getMockChildById } from '@/lib/placeholder-data';
 import type { Child, AttendanceRecord } from '@/types';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UserX, CalendarDays } from 'lucide-react';
+import { UserX, CalendarDays, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 // Mock function to simulate saving attendance
 async function saveAttendanceRecord(childId: string, date: string, status: AttendanceRecord['status'], notes?: string): Promise<void> {
@@ -29,12 +30,17 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
   const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord['status']>>({});
   const [notesData, setNotesData] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [schoolClass, setSchoolClass] = useState<SchoolClass | undefined>(undefined);
 
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') {
-    return <p>Access Denied.</p>;
-  }
+  const context = useContext(UserRoleContext);
 
-  const schoolClass = MOCK_CLASSES.find(c => c.id === params.classId && c.teacherId === MOCK_LOGGED_IN_USER.id);
+  useEffect(() => {
+    if (context && !context.isLoadingRole && context.currentUser && context.currentUser.role === 'teacher') {
+      const foundClass = MOCK_CLASSES.find(c => c.id === params.classId && c.teacherId === context.currentUser!.id);
+      setSchoolClass(foundClass);
+    }
+  }, [context, params.classId]);
+
 
   useEffect(() => {
     // Here you would typically fetch existing attendance records for the selectedDate and class
@@ -47,11 +53,26 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
     }
   }, [selectedDate, schoolClass]);
 
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'teacher') {
+    // Fallback, though layout should handle this
+    return <p>Access Denied.</p>; 
+  }
+
 
   if (!schoolClass) {
     return (
       <div className="container mx-auto py-8">
-        <Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle></Alert>
+        <Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle><AlertDescription>This class may not exist or you may not have permission to manage it.</AlertDescription></Alert>
       </div>
     );
   }
@@ -92,7 +113,7 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-primary">Manage Attendance for {schoolClass.name}</CardTitle>
           <CardDescription>
-            Mark attendance for students on {format(new Date(selectedDate.replace(/-/g, '/')), 'MMMM dd, yyyy')}. {/* Ensure date is parsed correctly for display */}
+            Mark attendance for students on {format(new Date(selectedDate.replace(/-/g, '/')), 'MMMM dd, yyyy')}.
           </CardDescription>
           <Link href="/teacher/dashboard">
             <Button variant="link" className="text-accent p-0">&larr; Back to Dashboard</Button>
@@ -158,6 +179,8 @@ export default function TeacherManageAttendancePage({ params }: { params: { clas
 
 // Basic Input component if not already globally available or for simplicity
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 ${props.className}`} />;
+  return <input {...props} className={`block w-full rounded-md border-input bg-background shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 ${props.className}`} />;
 }
+
+type SchoolClass = import('@/types').SchoolClass;
 

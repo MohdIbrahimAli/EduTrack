@@ -1,8 +1,9 @@
+
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
-// import { GeistMono } from 'geist/font/mono'; // Removed due to error and not being used
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { UserRoleProvider } from '@/context/UserRoleContext';
 
 export const metadata: Metadata = {
   title: 'EduAttend - School Attendance & Communication',
@@ -17,8 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body className="antialiased font-sans">
-        {children}
-        <Toaster />
+        <UserRoleProvider>
+          {children}
+          <Toaster />
+        </UserRoleProvider>
       </body>
     </html>
   );

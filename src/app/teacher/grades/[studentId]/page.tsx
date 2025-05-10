@@ -1,19 +1,19 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MOCK_LOGGED_IN_USER, getMockChildById, getMockGradeReports, getMockSubjectsForChild, MOCK_SUBJECTS } from '@/lib/placeholder-data';
+import { getMockChildById, getMockGradeReports, getMockSubjectsForChild, MOCK_SUBJECTS, MOCK_CLASSES, TEACHER_MOCK_USER } from '@/lib/placeholder-data';
 import type { Child, GradeReportEntry, Subject } from '@/types';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UserX, PlusCircle, Edit, BookOpen } from 'lucide-react';
+import { UserX, PlusCircle, Edit, BookOpen, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,16 +21,18 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import { format } from 'date-fns';
+import { UserRoleContext } from '@/context/UserRoleContext';
+
 
 // Mock function to save grade entry
-async function saveGradeEntry(studentId: string, entry: Omit<GradeReportEntry, 'id' | 'issuedBy'> & { id?: string }): Promise<GradeReportEntry> {
+async function saveGradeEntry(studentId: string, entry: Omit<GradeReportEntry, 'id' | 'issuedBy'> & { id?: string }, teacherId: string): Promise<GradeReportEntry> {
   console.log('Saving grade entry for student:', studentId, entry);
   const newId = entry.id || `grade-${Date.now()}`;
-  return { ...entry, id: newId, studentId, issuedBy: MOCK_LOGGED_IN_USER.id } as GradeReportEntry;
+  const subjectDetails = MOCK_SUBJECTS.find(s => s.id === entry.subjectId);
+  return { ...entry, id: newId, studentId, subject: subjectDetails?.name || 'Unknown Subject', issuedBy: teacherId } as GradeReportEntry;
 }
 
 export default function TeacherManageGradesPage({ params }: { params: { studentId: string } }) {
@@ -42,6 +44,8 @@ export default function TeacherManageGradesPage({ params }: { params: { studentI
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentGradeEntry, setCurrentGradeEntry] = useState<Partial<GradeReportEntry> | null>(null);
 
+  const context = useContext(UserRoleContext);
+
   useEffect(() => {
     const foundStudent = getMockChildById(params.studentId);
     setStudent(foundStudent || null);
@@ -51,17 +55,37 @@ export default function TeacherManageGradesPage({ params }: { params: { studentI
     }
   }, [params.studentId]);
 
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') {
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'teacher') {
     return <p>Access Denied.</p>;
   }
 
-  if (!student) {
+  if (!student && !context.isLoadingRole) { // Check after context has loaded
     return (
       <div className="container mx-auto py-8">
         <Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Student Not Found</AlertTitle></Alert>
       </div>
     );
   }
+  
+  if (!student) { // still loading student or truly not found
+     return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-2">Loading student details...</p>
+      </div>
+    );
+  }
+
 
   const handleOpenForm = (entry?: GradeReportEntry) => {
     setCurrentGradeEntry(entry || {
@@ -81,7 +105,7 @@ export default function TeacherManageGradesPage({ params }: { params: { studentI
     }
     setIsLoading(true);
     try {
-      const savedEntry = await saveGradeEntry(student.id, currentGradeEntry as any);
+      const savedEntry = await saveGradeEntry(student.id, currentGradeEntry as any, currentUser.id);
       if (currentGradeEntry.id) { // Editing
         setGradeReports(prev => prev.map(g => g.id === savedEntry.id ? savedEntry : g));
         toast({ title: "Success", description: "Grade entry updated." });
@@ -121,17 +145,19 @@ export default function TeacherManageGradesPage({ params }: { params: { studentI
           ) : (
             <div className="space-y-4">
               {gradeReports.map(entry => {
-                const subject = MOCK_SUBJECTS.find(s => s.id === entry.subjectId);
+                const subjectInfo = MOCK_SUBJECTS.find(s => s.id === entry.subjectId);
                 return (
                   <Card key={entry.id} className="p-4 bg-muted/10">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h3 className="font-semibold text-lg text-primary flex items-center gap-2"><BookOpen className="h-5 w-5"/> {subject?.name || 'Unknown Subject'} - <span className="text-accent">{entry.grade}</span></h3>
+                            <h3 className="font-semibold text-lg text-primary flex items-center gap-2"><BookOpen className="h-5 w-5"/> {entry.subject || subjectInfo?.name || 'Unknown Subject'} - <span className="text-accent">{entry.grade}</span></h3>
                             <p className="text-sm text-muted-foreground">Term: {entry.term}</p>
                             <p className="text-sm mt-1">{entry.teacherFeedback}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Issued by: {MOCK_LOGGED_IN_USER.id === entry.issuedBy ? 'You' : 'Another Teacher'}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Issued by: {currentUser.id === entry.issuedBy ? 'You' : MOCK_SUBJECTS.find(s=>s.teacherId === entry.issuedBy)?.teacherName || 'Another Teacher'}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleOpenForm(entry)}><Edit className="mr-1 h-4 w-4" /> Edit</Button>
+                        {currentUser.id === entry.issuedBy && (
+                           <Button variant="outline" size="sm" onClick={() => handleOpenForm(entry)}><Edit className="mr-1 h-4 w-4" /> Edit</Button>
+                        )}
                     </div>
                   </Card>
                 );
@@ -187,4 +213,3 @@ export default function TeacherManageGradesPage({ params }: { params: { studentI
     </div>
   );
 }
-

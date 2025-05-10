@@ -1,18 +1,19 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MOCK_LOGGED_IN_USER, MOCK_CLASSES, getMockClassesForTeacher } from '@/lib/placeholder-data';
-import type { SchoolNotification } from '@/types';
+import { getMockClassesForTeacher } from '@/lib/placeholder-data';
+import type { SchoolNotification, SchoolClass } from '@/types';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 // Mock function to simulate sending notification
 async function sendNotification(notification: Omit<SchoolNotification, 'id' | 'date' | 'read'>): Promise<SchoolNotification> {
@@ -28,9 +29,29 @@ export default function TeacherCreateNotificationPage() {
   const [type, setType] = useState<'announcement' | 'alert'>('announcement');
   const [targetAudience, setTargetAudience] = useState<SchoolNotification['targetAudience']>('all');
   const [targetClassId, setTargetClassId] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingForm, setIsLoadingForm] = useState(false); // Renamed from isLoading to avoid conflict
+  const [teacherClasses, setTeacherClasses] = useState<SchoolClass[]>([]);
 
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') {
+  const context = useContext(UserRoleContext);
+  
+  useEffect(() => {
+    if (context && !context.isLoadingRole && context.currentUser?.role === 'teacher') {
+      setTeacherClasses(getMockClassesForTeacher(context.currentUser.id));
+    }
+  }, [context]);
+
+
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'teacher') {
     return (
       <div className="container mx-auto py-8">
         <Card className="max-w-md mx-auto">
@@ -46,7 +67,6 @@ export default function TeacherCreateNotificationPage() {
     );
   }
   
-  const teacherClasses = getMockClassesForTeacher(MOCK_LOGGED_IN_USER.id);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +84,7 @@ export default function TeacherCreateNotificationPage() {
     }
 
 
-    setIsLoading(true);
+    setIsLoadingForm(true);
     try {
       await sendNotification({ title, content, type, targetAudience: finalTarget });
       toast({ title: "Success", description: "Notification sent successfully." });
@@ -77,7 +97,7 @@ export default function TeacherCreateNotificationPage() {
       toast({ title: "Error", description: "Failed to send notification.", variant: "destructive" });
       console.error("Failed to send notification", error);
     } finally {
-      setIsLoading(false);
+      setIsLoadingForm(false);
     }
   };
 
@@ -151,8 +171,8 @@ export default function TeacherCreateNotificationPage() {
 
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-              {isLoading ? 'Sending...' : 'Send Notification'}
+            <Button type="submit" disabled={isLoadingForm} className="w-full sm:w-auto">
+              {isLoadingForm ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send Notification'}
             </Button>
           </CardFooter>
         </form>
@@ -160,4 +180,3 @@ export default function TeacherCreateNotificationPage() {
     </div>
   );
 }
-

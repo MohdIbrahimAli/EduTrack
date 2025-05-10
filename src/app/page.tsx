@@ -1,13 +1,37 @@
 
-import { redirect } from 'next/navigation';
-import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data';
+'use client';
+
+import { useContext, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { UserRoleContext } from '@/context/UserRoleContext';
+import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
-  // In a real app, you would get the user's role from your authentication context
-  if (MOCK_LOGGED_IN_USER.role === 'teacher') {
-    redirect('/teacher/dashboard');
-  } else {
-    redirect('/dashboard'); // Parent dashboard
-  }
-  // return null; // redirect will handle this
+  const context = useContext(UserRoleContext);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (context) {
+      const { currentUser, isLoadingRole } = context;
+      if (!isLoadingRole) {
+        if (currentUser) {
+          if (currentUser.role === 'teacher') {
+            router.replace('/teacher/dashboard');
+          } else {
+            router.replace('/dashboard');
+          }
+        } else {
+          router.replace('/login-as');
+        }
+      }
+    }
+  }, [context, router]);
+
+  // Display a loading indicator while context is loading or redirecting
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="ml-4 text-lg text-muted-foreground">Loading EduAttend...</p>
+    </div>
+  );
 }

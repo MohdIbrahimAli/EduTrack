@@ -1,25 +1,55 @@
 
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MOCK_LOGGED_IN_USER, getMockClassesForTeacher, MOCK_CHILDREN } from "@/lib/placeholder-data";
+import { getMockClassesForTeacher, MOCK_CHILDREN } from "@/lib/placeholder-data";
 import type { SchoolClass, Child } from '@/types';
-import { Users, ArrowRight, Edit3, CalendarClock, ListChecks } from 'lucide-react';
+import { Users, ArrowRight, Edit3, CalendarClock, ListChecks, Loader2, AlertTriangle } from 'lucide-react';
+import { useContext } from 'react';
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 export default function TeacherDashboardPage() {
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') {
-    return <p>Access Denied. This page is for teachers only.</p>; // Or redirect
+  const context = useContext(UserRoleContext);
+
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'teacher') {
+    return (
+         <div className="container mx-auto py-8">
+            <Card className="max-w-md mx-auto">
+            <CardHeader>
+                <CardTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-destructive"/> Access Denied</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>This page is for teachers only. Your role is: {currentUser?.role || 'undefined'}</p>
+                {currentUser?.role === 'parent' && (
+                 <Link href="/dashboard"><Button variant="link">Go to Parent Dashboard</Button></Link>
+                )}
+            </CardContent>
+            </Card>
+      </div>
+    );
   }
 
-  const teacherId = MOCK_LOGGED_IN_USER.id;
+  const teacherId = currentUser.id;
   const teacherClasses = getMockClassesForTeacher(teacherId);
 
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-primary">Teacher Dashboard</h1>
-        <p className="text-muted-foreground">Welcome, {MOCK_LOGGED_IN_USER.name}!</p>
+        <p className="text-muted-foreground">Welcome, {currentUser.name}!</p>
       </div>
 
       <h2 className="text-2xl font-semibold mb-6 text-primary">My Classes</h2>
@@ -83,4 +113,3 @@ export default function TeacherDashboardPage() {
     </div>
   );
 }
-

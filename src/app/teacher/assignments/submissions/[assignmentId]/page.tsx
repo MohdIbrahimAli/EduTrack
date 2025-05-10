@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MOCK_LOGGED_IN_USER, MOCK_CLASSES, getMockChildById, getMockAssignmentsForClass, getMockAssignmentSubmissionsForAssignment, MOCK_SUBJECTS } from '@/lib/placeholder-data';
+import { MOCK_CLASSES, getMockChildById, getMockAssignmentsForClass, getMockAssignmentSubmissionsForAssignment, MOCK_SUBJECTS, MOCK_ASSIGNMENT_SUBMISSIONS } from '@/lib/placeholder-data';
 import type { SchoolClass, Assignment, AssignmentSubmission, Child } from '@/types';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UserX, CheckCircle, XCircle, Edit, Send } from 'lucide-react';
+import { UserX, CheckCircle, XCircle, Edit, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useSearchParams } from 'next/navigation';
@@ -22,21 +22,35 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 // Mock function to save grade/feedback
-async function saveGradeAndFeedback(submissionId: string, grade: string, feedback: string): Promise<AssignmentSubmission> {
-  console.log("Saving grade/feedback for submission:", submissionId, { grade, feedback });
-  // In real app, update Firestore
-  const existingSubmission = MOCK_ASSIGNMENT_SUBMISSIONS.find(s => s.id === submissionId);
-  if (!existingSubmission) throw new Error("Submission not found");
-  const updatedSubmission = { ...existingSubmission, grade, feedback };
-  // Update mock data for demo
-  const index = MOCK_ASSIGNMENT_SUBMISSIONS.findIndex(s => s.id === submissionId);
-  if (index !== -1) MOCK_ASSIGNMENT_SUBMISSIONS[index] = updatedSubmission;
-  return updatedSubmission;
+async function saveGradeAndFeedback(submissionId: string, grade: string, feedback: string, teacherId: string): Promise<AssignmentSubmission> {
+  console.log("Saving grade/feedback for submission:", submissionId, { grade, feedback, teacherId });
+  
+  const existingSubmissionIndex = MOCK_ASSIGNMENT_SUBMISSIONS.findIndex(s => s.id === submissionId);
+  
+  if (existingSubmissionIndex !== -1) {
+    const updatedSubmission = { 
+        ...MOCK_ASSIGNMENT_SUBMISSIONS[existingSubmissionIndex], 
+        grade, 
+        feedback,
+        // gradedBy: teacherId // Optionally track who graded
+    };
+    MOCK_ASSIGNMENT_SUBMISSIONS[existingSubmissionIndex] = updatedSubmission;
+    return updatedSubmission;
+  } else {
+    // This case handles if a teacher is grading a non-existent submission (e.g. for offline work)
+    // This requires more fields like studentId, assignmentId if creating new.
+    // For this example, we assume submission always exists if currentGradingSubmission.id is not new.
+    // If creating a new submission entry through grading:
+    // const newSubmission = { id: submissionId, assignmentId: ..., studentId: ..., grade, feedback, isSubmitted: false, gradedBy: teacherId };
+    // MOCK_ASSIGNMENT_SUBMISSIONS.push(newSubmission);
+    // return newSubmission;
+    throw new Error("Original submission not found for update, and new submission creation via grading is not fully implemented in mock.");
+  }
 }
 
 
@@ -48,39 +62,70 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [students, setStudents] = useState<Child[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [isGradingFormOpen, setIsGradingFormOpen] = useState(false);
   const [currentGradingSubmission, setCurrentGradingSubmission] = useState<AssignmentSubmission | null>(null);
   const [currentGrade, setCurrentGrade] = useState('');
   const [currentFeedback, setCurrentFeedback] = useState('');
+  const [isLoadingForm, setIsLoadingForm] = useState(false);
 
-  const schoolClass = classId ? MOCK_CLASSES.find(c => c.id === classId && c.teacherId === MOCK_LOGGED_IN_USER.id) : null;
+  const [schoolClass, setSchoolClass] = useState<SchoolClass | undefined>(undefined);
+  const context = useContext(UserRoleContext);
+
 
   useEffect(() => {
-    if (schoolClass) {
-      const foundAssignment = getMockAssignmentsForClass(schoolClass.id).find(a => a.id === params.assignmentId);
-      setAssignment(foundAssignment || null);
-      if (foundAssignment) {
-        setSubmissions(getMockAssignmentSubmissionsForAssignment(foundAssignment.id));
-        const classStudents = schoolClass.studentIds.map(id => getMockChildById(id)).filter(Boolean) as Child[];
-        setStudents(classStudents);
+    if (context && !context.isLoadingRole && context.currentUser?.role === 'teacher' && classId) {
+      const foundClass = MOCK_CLASSES.find(c => c.id === classId && c.teacherId === context.currentUser!.id);
+      setSchoolClass(foundClass);
+      if (foundClass) {
+        const foundAssignment = getMockAssignmentsForClass(foundClass.id).find(a => a.id === params.assignmentId);
+        setAssignment(foundAssignment || null);
+        if (foundAssignment) {
+          setSubmissions(getMockAssignmentSubmissionsForAssignment(foundAssignment.id));
+          const classStudents = foundClass.studentIds.map(id => getMockChildById(id)).filter(Boolean) as Child[];
+          setStudents(classStudents);
+        }
       }
+      setIsLoadingPage(false);
+    } else if (context && !context.isLoadingRole) {
+      setIsLoadingPage(false); // Not a teacher or no user or no classId
     }
-  }, [schoolClass, params.assignmentId]);
+  }, [context, params.assignmentId, classId]);
 
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') return <p>Access Denied.</p>;
-  if (!schoolClass) return <div className="container mx-auto py-8"><Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle></Alert></div>;
+  if (!context || context.isLoadingRole || isLoadingPage) {
+     return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'teacher') return <p>Access Denied.</p>;
+  if (!schoolClass) return <div className="container mx-auto py-8"><Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle><AlertDescription>Ensure you are accessing submissions via a valid class link.</AlertDescription></Alert></div>;
   if (!assignment) return <div className="container mx-auto py-8"><Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Assignment Not Found</AlertTitle></Alert></div>;
 
   const subject = MOCK_SUBJECTS.find(s => s.id === assignment.subjectId);
 
   const handleOpenGradingForm = (submission: AssignmentSubmission | null, studentId: string) => {
+    const student = getMockChildById(studentId);
+    if (!student) return;
+
     if (submission) {
         setCurrentGradingSubmission(submission);
         setCurrentGrade(submission.grade || '');
         setCurrentFeedback(submission.feedback || '');
-    } else { // No submission yet, but teacher might want to enter grade/feedback (e.g. for offline work)
-        setCurrentGradingSubmission({ id: `new-${studentId}-${assignment.id}`, assignmentId: assignment.id, studentId, isSubmitted: false });
+    } else { 
+        // Create a temporary submission object for grading if one doesn't exist
+        // This is for cases where teacher wants to input a grade for unsubmitted/offline work
+        const tempSubmission: AssignmentSubmission = { 
+          id: `temp-${studentId}-${assignment.id}-${Date.now()}`, // Ensure unique temp ID
+          assignmentId: assignment.id, 
+          studentId, 
+          isSubmitted: false 
+        };
+        setCurrentGradingSubmission(tempSubmission);
         setCurrentGrade('');
         setCurrentFeedback('');
     }
@@ -89,22 +134,32 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
 
   const handleGradeSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!currentGradingSubmission) return;
-    setIsLoading(true);
+    if (!currentGradingSubmission || !currentUser) return;
+    setIsLoadingForm(true);
     try {
-        const updatedSubmission = await saveGradeAndFeedback(currentGradingSubmission.id, currentGrade, currentFeedback);
-        // Update local state for submissions
+        const updatedSubmission = await saveGradeAndFeedback(currentGradingSubmission.id, currentGrade, currentFeedback, currentUser.id);
         setSubmissions(prev => {
-            const existing = prev.find(s => s.id === updatedSubmission.id);
-            if(existing) return prev.map(s => s.id === updatedSubmission.id ? updatedSubmission : s);
-            return [...prev, updatedSubmission]; // Add if it was a new grading entry
+            const existingIndex = prev.findIndex(s => s.studentId === updatedSubmission.studentId); // Match by studentId if temp ID was used
+            if(existingIndex !== -1) {
+                const newSubmissions = [...prev];
+                newSubmissions[existingIndex] = updatedSubmission;
+                return newSubmissions;
+            }
+            // If it was a truly new grading entry for unsubmitted work, and mock save creates it.
+            // This depends on how saveGradeAndFeedback handles new IDs.
+            // For this mock, we'll assume it updates or adds to MOCK_ASSIGNMENT_SUBMISSIONS.
+            // Then, re-fetch or update local state accurately.
+            // A simpler mock update:
+            const found = MOCK_ASSIGNMENT_SUBMISSIONS.find(s => s.id === updatedSubmission.id);
+            if (found) return prev.map(s => s.id === updatedSubmission.id ? updatedSubmission : s);
+            return [...prev, updatedSubmission]; 
         });
         toast({ title: "Success", description: "Grade and feedback saved." });
         setIsGradingFormOpen(false);
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to save grade/feedback.", variant: "destructive" });
+    } catch (error: any) {
+        toast({ title: "Error", description: error.message || "Failed to save grade/feedback.", variant: "destructive" });
     } finally {
-        setIsLoading(false);
+        setIsLoadingForm(false);
     }
   };
 
@@ -128,14 +183,14 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
                 const submission = submissions.find(s => s.studentId === student.id);
                 return (
                   <Card key={student.id} className="p-4 bg-muted/20">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2">
                       <div className="flex items-center gap-3">
                         {student.avatarUrl && <Image src={student.avatarUrl} alt={student.name} width={40} height={40} className="rounded-full" data-ai-hint={student.dataAiHint || "student"}/>}
                         <p className="font-semibold text-foreground">{student.name}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 sm:ml-auto">
                         {submission?.isSubmitted ? (
-                          <Badge variant="default" className="bg-green-500 text-white">Submitted {submission.submittedDate ? format(new Date(submission.submittedDate.replace(/-/g,'/')), 'PP') : ''}</Badge>
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white">Submitted {submission.submittedDate ? format(new Date(submission.submittedDate.replace(/-/g,'/')), 'PP') : ''}</Badge>
                         ) : (
                           <Badge variant="destructive">Not Submitted</Badge>
                         )}
@@ -176,7 +231,7 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                    <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Grade'}</Button>
+                    <Button type="submit" disabled={isLoadingForm}>{isLoadingForm ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Grade'}</Button>
                 </DialogFooter>
             </form>
         </DialogContent>
@@ -184,13 +239,3 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
     </div>
   );
 }
-
-// Minimal Badge component (replace with your actual Badge or remove if not used)
-function Badge({ children, variant, className }: { children: React.ReactNode, variant?: string, className?: string }) {
-  const baseStyle = "px-2 py-0.5 rounded-full text-xs font-semibold ";
-  let variantStyle = "bg-gray-200 text-gray-800";
-  if (variant === "default") variantStyle = "bg-primary text-primary-foreground";
-  if (variant === "destructive") variantStyle = "bg-destructive text-destructive-foreground";
-  return <span className={`${baseStyle} ${variantStyle} ${className}`}>{children}</span>;
-}
-

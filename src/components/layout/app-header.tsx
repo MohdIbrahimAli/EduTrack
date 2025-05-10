@@ -1,7 +1,8 @@
 
 'use client';
 import type { ReactNode } from 'react';
-import { Bell, Menu } from 'lucide-react';
+import { useContext } from 'react';
+import { Bell, Menu, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,9 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data'; // Use the dynamic logged-in user
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'; 
 import { useRouter } from 'next/navigation';
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 
 interface AppHeaderProps {
@@ -51,12 +52,30 @@ export function AppHeader({ title, children }: AppHeaderProps) {
 
 function UserMenu() {
   const router = useRouter();
-  const user = MOCK_LOGGED_IN_USER; // Use the dynamic logged-in user
+  const context = useContext(UserRoleContext);
+
+  if (!context) {
+    // This should ideally not happen if context provider is set up correctly
+    return <Loader2 className="h-5 w-5 animate-spin" />;
+  }
+  
+  const { currentUser, logout, isLoadingRole } = context;
+
+  if (isLoadingRole) {
+    return <Loader2 className="h-5 w-5 animate-spin" />;
+  }
+
+  if (!currentUser) {
+    // This case might occur if logout happens and header is still trying to render user menu
+    // Or if user is not logged in, though layout should redirect.
+    // Fallback or redirect logic can be here if needed, but typically layout handles redirection.
+    return null; 
+  }
+
 
   const handleLogout = () => {
-    // In a real app, this would call an auth service to sign out
-    // For now, redirect to a conceptual login/home page
-    router.push('/'); 
+    logout();
+    router.push('/login-as'); 
   };
 
   return (
@@ -64,13 +83,13 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint || "user avatar"} />
-            <AvatarFallback>{user.name ? user.name.substring(0, 1) : 'U'}</AvatarFallback>
+            <AvatarImage src={currentUser.avatarUrl} alt={currentUser.name} data-ai-hint={currentUser.dataAiHint || "user avatar"} />
+            <AvatarFallback>{currentUser.name ? currentUser.name.substring(0, 1) : 'U'}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
+        <DropdownMenuLabel>{currentUser.name}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/profile">Profile</Link>
@@ -84,4 +103,3 @@ function UserMenu() {
     </DropdownMenu>
   );
 }
-

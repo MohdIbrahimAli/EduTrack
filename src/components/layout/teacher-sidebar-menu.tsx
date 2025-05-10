@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ListChecks, Edit3, BellPlus, CalendarClock } from 'lucide-react';
+import { LayoutDashboard, Users, ListChecks, Edit3, BellPlus, CalendarClock, Loader2 } from 'lucide-react';
 import {
   SidebarMenu as Menu,
   SidebarMenuItem as Item,
@@ -12,28 +12,48 @@ import {
   SidebarMenuSubButton as SubButton,
   SidebarMenuSubItem as SubItem,
 } from '@/components/ui/sidebar';
-import { getMockClassesForTeacher, MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data';
+import { getMockClassesForTeacher } from '@/lib/placeholder-data';
+import { useContext, useState, useEffect } from 'react';
+import { UserRoleContext } from '@/context/UserRoleContext';
+import type { SchoolClass } from '@/types';
 
 const teacherMenuItems = [
   { href: '/teacher/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/teacher/notifications/create', label: 'Post Notification', icon: BellPlus },
-  // More general teacher links can go here
 ];
-
-// Get classes for the logged-in teacher (assuming MOCK_LOGGED_IN_USER is the teacher)
-const teacherClasses = MOCK_LOGGED_IN_USER.role === 'teacher' ? getMockClassesForTeacher(MOCK_LOGGED_IN_USER.id) : [];
 
 const classSpecificPages = [
     { baseHref: '/teacher/attendance', label: 'Manage Attendance', icon: CalendarClock },
     { baseHref: '/teacher/assignments', label: 'Manage Assignments', icon: ListChecks },
-    { baseHref: '/teacher/grades', label: 'Manage Grades', icon: Edit3 }, // Maybe per student or per assignment
-    // { baseHref: '/teacher/syllabus', label: 'Manage Syllabus', icon: BookOpen }, // Syllabus might be per subject, not class here
+    // For grades, navigate to class students page first, then to individual student grades.
+    // { baseHref: '/teacher/grades', label: 'Manage Grades', icon: Edit3 }, 
 ];
 
 
 export function TeacherSidebarMenu() {
   const pathname = usePathname();
+  const context = useContext(UserRoleContext);
+  const [teacherClasses, setTeacherClasses] = useState<SchoolClass[]>([]);
+
+  useEffect(() => {
+    if (context && !context.isLoadingRole && context.currentUser?.role === 'teacher') {
+      setTeacherClasses(getMockClassesForTeacher(context.currentUser.id));
+    }
+  }, [context]);
+
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="p-4 flex justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-sidebar-foreground" />
+      </div>
+    );
+  }
+
+  if (context.currentUser?.role !== 'teacher') {
+    return null; // Or some other UI if a non-teacher views this somehow
+  }
 
   return (
     <Menu>
@@ -59,6 +79,18 @@ export function TeacherSidebarMenu() {
              {schoolClass.name}
            </Button>
           <Sub>
+            <SubItem key={`${schoolClass.id}-students`}>
+                <Link href={`/teacher/class/${schoolClass.id}/students`} passHref legacyBehavior>
+                    <SubButton
+                    size="md"
+                    isActive={isActive(`/teacher/class/${schoolClass.id}/students`)}
+                    className="w-full justify-start"
+                    >
+                    <Users className="h-4 w-4 mr-2" />
+                    <span>View Students</span>
+                    </SubButton>
+                </Link>
+            </SubItem>
             {classSpecificPages.map(page => (
               <SubItem key={`${schoolClass.id}-${page.baseHref}`}>
                 <Link href={`${page.baseHref}/${schoolClass.id}`} passHref legacyBehavior>
@@ -73,8 +105,6 @@ export function TeacherSidebarMenu() {
                 </Link>
               </SubItem>
             ))}
-            {/* Add link to manage syllabus for subjects in this class */}
-            {/* This part needs subjects linked to classes more directly, or iterate MOCK_SUBJECTS linked to this class teacher */}
           </Sub>
         </Item>
       ))}

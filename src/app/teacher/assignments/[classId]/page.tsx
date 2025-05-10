@@ -1,17 +1,17 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input'; // Assuming ShadCN input
-import { Textarea } from '@/components/ui/textarea'; // Assuming ShadCN textarea
-import { MOCK_LOGGED_IN_USER, MOCK_CLASSES, getMockAssignmentsForClass, MOCK_SUBJECTS, getMockChildById } from '@/lib/placeholder-data';
-import type { SchoolClass, Assignment, AssignmentSubmission } from '@/types';
+import { Input } from '@/components/ui/input'; 
+import { Textarea } from '@/components/ui/textarea'; 
+import { MOCK_CLASSES, getMockAssignmentsForClass, MOCK_SUBJECTS } from '@/lib/placeholder-data';
+import type { SchoolClass, Assignment, AssignmentSubmission, Subject as SubjectType } from '@/types';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UserX, PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
+import { UserX, PlusCircle, Edit, Trash2, Eye, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -25,18 +25,16 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 
-// Mock function to simulate saving assignment
-async function saveAssignment(classId: string, assignment: Omit<Assignment, 'id' | 'createdBy'> & { id?: string }): Promise<Assignment> {
+async function saveAssignment(classId: string, assignment: Omit<Assignment, 'id' | 'createdBy'> & { id?: string }, teacherId: string): Promise<Assignment> {
   console.log('Saving assignment:', { classId, assignment });
-  // In a real app, this would interact with Firestore
   const newId = assignment.id || `assignNew-${Date.now()}`;
-  return { ...assignment, id: newId, createdBy: MOCK_LOGGED_IN_USER.id } as Assignment;
+  return { ...assignment, id: newId, createdBy: teacherId } as Assignment;
 }
 async function deleteAssignment(assignmentId: string): Promise<void> {
   console.log('Deleting assignment:', assignmentId);
-  // In a real app, this would interact with Firestore
   return new Promise(resolve => setTimeout(resolve, 300));
 }
 
@@ -44,26 +42,49 @@ async function deleteAssignment(assignmentId: string): Promise<void> {
 export default function TeacherManageAssignmentsPage({ params }: { params: { classId: string } }) {
   const { toast } = useToast();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentAssignment, setCurrentAssignment] = useState<Partial<Assignment> | null>(null);
+  const [isLoadingForm, setIsLoadingForm] = useState(false);
+  
+  const [schoolClass, setSchoolClass] = useState<SchoolClass | undefined>(undefined);
+  const [subjectsForClass, setSubjectsForClass] = useState<SubjectType[]>([]);
 
-  const schoolClass = MOCK_CLASSES.find(c => c.id === params.classId && c.teacherId === MOCK_LOGGED_IN_USER.id);
-  const subjectsForClass = schoolClass ? MOCK_SUBJECTS.filter(s => s.classId === schoolClass.id && s.teacherId === MOCK_LOGGED_IN_USER.id) : [];
-
+  const context = useContext(UserRoleContext);
 
   useEffect(() => {
-    if (schoolClass) {
-      setAssignments(getMockAssignmentsForClass(schoolClass.id));
+    if (context && !context.isLoadingRole && context.currentUser?.role === 'teacher') {
+      const foundClass = MOCK_CLASSES.find(c => c.id === params.classId && c.teacherId === context.currentUser.id);
+      setSchoolClass(foundClass);
+      if (foundClass) {
+        setAssignments(getMockAssignmentsForClass(foundClass.id));
+        setSubjectsForClass(MOCK_SUBJECTS.filter(s => s.classId === foundClass.id && s.teacherId === context.currentUser!.id));
+      }
+      setIsLoadingPage(false);
+    } else if (context && !context.isLoadingRole) {
+      // Not a teacher or no user
+      setIsLoadingPage(false);
     }
-  }, [schoolClass]);
+  }, [context, params.classId]);
 
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') {
+
+  if (!context || context.isLoadingRole || isLoadingPage) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'teacher') {
     return <p>Access Denied.</p>;
   }
   if (!schoolClass) {
-    return <div className="container mx-auto py-8"><Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle></Alert></div>;
+    return <div className="container mx-auto py-8"><Alert variant="destructive"><UserX className="h-4 w-4" /><AlertTitle>Class Not Found</AlertTitle><AlertDescription>This class may not exist or you may not have permission to manage it.</AlertDescription></Alert></div>;
   }
+
 
   const handleOpenForm = (assignment?: Assignment) => {
     setCurrentAssignment(assignment || { title: '', description: '', dueDate: format(new Date(), 'yyyy-MM-dd'), subjectId: subjectsForClass[0]?.id || '' });
@@ -76,14 +97,14 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
       toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
-    setIsLoading(true);
+    setIsLoadingForm(true);
     try {
-      const savedAssignment = await saveAssignment(schoolClass.id, currentAssignment as any);
+      const savedAssignment = await saveAssignment(schoolClass.id, currentAssignment as any, currentUser.id);
       if (currentAssignment.id) { // Editing
         setAssignments(prev => prev.map(a => a.id === savedAssignment.id ? savedAssignment : a));
         toast({ title: "Success", description: "Assignment updated." });
       } else { // Creating
-        setAssignments(prev => [...prev, savedAssignment]);
+        setAssignments(prev => [savedAssignment, ...prev ]); // Add to beginning of list
         toast({ title: "Success", description: "Assignment created." });
       }
       setIsFormOpen(false);
@@ -91,13 +112,21 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
     } catch (error) {
       toast({ title: "Error", description: "Failed to save assignment.", variant: "destructive" });
     } finally {
-      setIsLoading(false);
+      setIsLoadingForm(false);
     }
   };
   
   const handleDeleteAssignment = async (assignmentId: string) => {
-    if (!confirm("Are you sure you want to delete this assignment?")) return;
-    setIsLoading(true);
+     // Consider using AlertDialog for confirmation
+    const confirmDelete = await new Promise<boolean>((resolve) => {
+        // This is a placeholder for a proper confirmation dialog.
+        // In a real app, use <AlertDialog> from shadcn/ui.
+        resolve(window.confirm("Are you sure you want to delete this assignment?"));
+    });
+
+    if (!confirmDelete) return;
+
+    setIsLoadingForm(true); // Can use a general loading state for the page as well
     try {
       await deleteAssignment(assignmentId);
       setAssignments(prev => prev.filter(a => a.id !== assignmentId));
@@ -105,7 +134,7 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
     } catch (error) {
       toast({ title: "Error", description: "Failed to delete assignment.", variant: "destructive" });
     } finally {
-      setIsLoading(false);
+      setIsLoadingForm(false);
     }
   };
 
@@ -148,7 +177,7 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
                         <Button variant="outline" size="sm"><Eye className="mr-1 h-4 w-4" /> View Submissions</Button>
                       </Link>
                       <Button variant="outline" size="sm" onClick={() => handleOpenForm(assignment)}><Edit className="mr-1 h-4 w-4" /> Edit</Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDeleteAssignment(assignment.id)} disabled={isLoading}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteAssignment(assignment.id)} disabled={isLoadingForm}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>
                     </div>
                   </div>
                 </Card>
@@ -175,12 +204,14 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
                  <Select
                     value={currentAssignment?.subjectId || ''}
                     onValueChange={(value) => setCurrentAssignment(p => ({ ...p, subjectId: value }))}
+                    required
                   >
                     <SelectTrigger id="subjectId"><SelectValue placeholder="Select subject" /></SelectTrigger>
                     <SelectContent>
                       {subjectsForClass.map(subject => (
                         <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
                       ))}
+                       {subjectsForClass.length === 0 && <SelectItem value="" disabled>No subjects found for this class</SelectItem>}
                     </SelectContent>
                   </Select>
               </div>
@@ -195,7 +226,7 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
             </div>
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-              <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Assignment'}</Button>
+              <Button type="submit" disabled={isLoadingForm}>{isLoadingForm ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Assignment'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -203,4 +234,3 @@ export default function TeacherManageAssignmentsPage({ params }: { params: { cla
     </div>
   );
 }
-

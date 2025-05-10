@@ -1,13 +1,30 @@
 
-import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data';
+'use client';
+
+import { useContext } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mail, User, CalendarDays, Edit3, Briefcase } from 'lucide-react';
+import { Mail, User, CalendarDays, Edit3, Briefcase, Loader2 } from 'lucide-react';
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 export default function ProfilePage() {
-  // In a real app, you'd fetch user data or use an auth context
-  const user = MOCK_LOGGED_IN_USER;
+  const context = useContext(UserRoleContext);
+
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const { currentUser: user } = context;
+
+  if (!user) {
+    // Should be redirected by layout if no user, but as a fallback:
+    return <p>Please log in to view your profile.</p>;
+  }
 
   return (
     <div className="container mx-auto py-8">

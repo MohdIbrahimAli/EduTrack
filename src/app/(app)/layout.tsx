@@ -1,6 +1,8 @@
 
 'use client';
 import type { ReactNode } from 'react';
+import { useContext, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -12,28 +14,38 @@ import {
 import { AppHeader } from '@/components/layout/app-header';
 import { SidebarMenu } from '@/components/layout/sidebar-menu';
 import { Button } from '@/components/ui/button';
-import { Settings, LifeBuoy, LogOut, School } from 'lucide-react';
+import { Settings, LifeBuoy, LogOut, School, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data'; // Import mock user
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const context = useContext(UserRoleContext);
 
-  const handleLogout = () => {
-    // In a real app, this would call an auth service to sign out
-    // For now, redirect to a conceptual login/home page
-    router.push('/'); 
-  };
-
-  // Redirect if a teacher tries to access parent section
-  if (MOCK_LOGGED_IN_USER.role === 'teacher') {
-    if (typeof window !== 'undefined') { // Ensure this runs client-side for useRouter
-      router.replace('/teacher/dashboard');
+  useEffect(() => {
+    if (context && !context.isLoadingRole) {
+      if (!context.currentUser) {
+        router.replace('/login-as');
+      } else if (context.currentUser.role !== 'parent') {
+        router.replace('/teacher/dashboard'); // Or an access denied page
+      }
     }
-    return <p>Redirecting...</p>; // Or a loading spinner
+  }, [context, router]);
+
+  if (!context || context.isLoadingRole || !context.currentUser || context.currentUser.role !== 'parent') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
   }
 
+  const { logout } = context;
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login-as'); 
+  };
 
   return (
     <SidebarProvider defaultOpen={true}>

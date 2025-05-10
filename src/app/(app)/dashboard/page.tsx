@@ -1,12 +1,16 @@
 
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MOCK_CHILDREN, MOCK_LOGGED_IN_USER } from "@/lib/placeholder-data";
+import { MOCK_CHILDREN, getChildrenForParentUID } from "@/lib/placeholder-data";
 import type { Child } from '@/types';
-import { CheckCircle, XCircle, Clock, ArrowRight, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useContext } from 'react';
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 function AttendanceStatusIcon({ status }: { status: Child['currentAttendanceStatus'] }) {
   switch (status) {
@@ -22,7 +26,20 @@ function AttendanceStatusIcon({ status }: { status: Child['currentAttendanceStat
 }
 
 export default function DashboardPage() {
-  if (MOCK_LOGGED_IN_USER.role !== 'parent') {
+  const context = useContext(UserRoleContext);
+
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const { currentUser } = context;
+
+  if (!currentUser || currentUser.role !== 'parent') {
+     // This check should be redundant if AppLayout handles redirection, but serves as a fallback.
      return (
       <div className="container mx-auto py-8">
         <Card className="max-w-md mx-auto">
@@ -30,25 +47,19 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-destructive"/> Access Denied</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>This page is for parents only.</p>
-            {MOCK_LOGGED_IN_USER.role === 'teacher' && (
-              <Link href="/teacher/dashboard"><Button variant="link">Go to Teacher Dashboard</Button></Link>
-            )}
+            <p>This page is for parents only. Your role is: {currentUser?.role || 'undefined'}</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Filter MOCK_CHILDREN to only those belonging to the logged-in parent
-  // This requires parentUid on Child objects, which is not in the current Child type.
-  // For now, we'll assume all MOCK_CHILDREN are for the PARENT_MOCK_USER if logged in.
-  // In a real app, you'd fetch children for PARENT_MOCK_USER.id
-  const parentChildren = MOCK_CHILDREN; // Simplified for now
+  // Fetch children for the currently logged-in parent
+  const parentChildren = getChildrenForParentUID(currentUser.id);
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8 text-primary">Attendance Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8 text-primary">Parent Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {parentChildren.map((child) => (
           <Card key={child.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg overflow-hidden">

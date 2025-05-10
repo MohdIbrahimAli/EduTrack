@@ -1,18 +1,19 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import type { Conversation, Message } from '@/types';
-import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, UserCircle, MessageSquareDashed } from 'lucide-react';
+import { Send, UserCircle, MessageSquareDashed, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge'; 
+import { UserRoleContext } from '@/context/UserRoleContext';
+
 
 interface ChatInterfaceProps {
   initialConversations: Conversation[];
@@ -24,9 +25,27 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
     initialConversations.length > 0 ? initialConversations[0].id : null
   );
   const [newMessage, setNewMessage] = useState('');
+  
+  const context = useContext(UserRoleContext);
+
+  if (!context || context.isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  const { currentUser } = context;
+
+  if (!currentUser) {
+    // This case should be handled by layout redirecting to login,
+    // but as a fallback:
+    return <p className="p-4 text-center text-destructive">User not authenticated. Please log in.</p>;
+  }
+
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
-  const currentUser = MOCK_LOGGED_IN_USER;
+  
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +60,7 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
       dataAiHint: currentUser.dataAiHint,
       timestamp: new Date().toISOString(),
       text: newMessage.trim(),
-      isOwnMessage: true, // This will be true for the sender
+      isOwnMessage: true, 
     };
 
     const updatedConversations = conversations.map(conv => {
@@ -52,7 +71,6 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
           messages: updatedMessages,
           lastMessagePreview: message.text,
           lastMessageTimestamp: message.timestamp,
-          // Reset unread count for the current user if they are sending a message in this convo
           unreadCounts: {
             ...(conv.unreadCounts || {}),
             [currentUser.id]: 0,
@@ -63,18 +81,16 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
     });
     setConversations(updatedConversations);
     setNewMessage('');
-    // In a real app, this would also send the message to the backend
   };
   
   const getOtherParticipantDetails = (conv: Conversation) => {
     const otherParticipantId = conv.participantIds.find(id => id !== currentUser.id);
-    return otherParticipantId ? conv.participantDetails[otherParticipantId] : { name: "Unknown Contact", avatarUrl: undefined };
+    return otherParticipantId ? conv.participantDetails[otherParticipantId] : { name: "Unknown Contact", avatarUrl: undefined, role: 'parent' as 'parent' | 'teacher' };
   };
 
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-12rem)] md:h-[calc(100vh-8rem)] border rounded-lg shadow-lg overflow-hidden bg-card">
-      {/* Conversation List */}
       <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r">
         <CardHeader className="p-4 border-b">
           <CardTitle className="text-lg font-semibold text-primary">Conversations</CardTitle>
@@ -110,7 +126,6 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
         </ScrollArea>
       </div>
 
-      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedConversation ? (
           <>

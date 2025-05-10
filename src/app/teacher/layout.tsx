@@ -1,6 +1,8 @@
 
 'use client';
 import type { ReactNode } from 'react';
+import { useContext, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -9,30 +11,41 @@ import {
   SidebarFooter,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { AppHeader } from '@/components/layout/app-header'; // Can reuse or make a TeacherAppHeader
+import { AppHeader } from '@/components/layout/app-header'; 
 import { TeacherSidebarMenu } from '@/components/layout/teacher-sidebar-menu';
 import { Button } from '@/components/ui/button';
-import { Settings, LifeBuoy, LogOut, School } from 'lucide-react';
+import { Settings, LifeBuoy, LogOut, School, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data'; // To display user info
+import { UserRoleContext } from '@/context/UserRoleContext';
 
 export default function TeacherAppLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const context = useContext(UserRoleContext);
+
+  useEffect(() => {
+    if (context && !context.isLoadingRole) {
+      if (!context.currentUser) {
+        router.replace('/login-as');
+      } else if (context.currentUser.role !== 'teacher') {
+        router.replace('/dashboard'); // Or an access denied page
+      }
+    }
+  }, [context, router]);
+
+  if (!context || context.isLoadingRole || !context.currentUser || context.currentUser.role !== 'teacher') {
+     return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const { logout } = context;
 
   const handleLogout = () => {
-    // In a real app, this would call an auth service to sign out
-    // For now, redirect to a conceptual login/home page
-    router.push('/'); 
+    logout();
+    router.push('/login-as'); 
   };
-
-  if (MOCK_LOGGED_IN_USER.role !== 'teacher') {
-    // This is a client-side redirect, ideally handled by middleware or page.tsx for SSR
-    if (typeof window !== 'undefined') {
-      router.replace('/dashboard'); // Redirect non-teachers to parent dashboard
-    }
-    return <p>Redirecting...</p>; // Or a loading spinner
-  }
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -47,7 +60,7 @@ export default function TeacherAppLayout({ children }: { children: ReactNode }) 
           <TeacherSidebarMenu />
         </SidebarContent>
         <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
-          <Link href="/settings" passHref legacyBehavior> {/* Shared settings page for now */}
+          <Link href="/settings" passHref legacyBehavior>
             <Button asChild variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center">
               <a>
                 <Settings className="h-5 w-5" />
@@ -55,7 +68,7 @@ export default function TeacherAppLayout({ children }: { children: ReactNode }) 
               </a>
             </Button>
           </Link>
-          <Link href="/help" passHref legacyBehavior> {/* Shared help page for now */}
+          <Link href="/help" passHref legacyBehavior>
             <Button asChild variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center">
               <a>
                 <LifeBuoy className="h-5 w-5" />
@@ -70,7 +83,6 @@ export default function TeacherAppLayout({ children }: { children: ReactNode }) 
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        {/* AppHeader might need context if user info display differs, or pass MOCK_LOGGED_IN_USER */}
         <AppHeader /> 
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           {children}
@@ -79,4 +91,3 @@ export default function TeacherAppLayout({ children }: { children: ReactNode }) 
     </SidebarProvider>
   );
 }
-

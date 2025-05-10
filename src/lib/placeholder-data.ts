@@ -21,11 +21,8 @@ export const TEACHER_MOCK_USER: User = {
   role: 'teacher',
 };
 
-// SIMULATE LOGGED IN USER (switch role here to test different flows)
-const MOCK_USER_ROLE: 'parent' | 'teacher' = 'parent';
-// const MOCK_USER_ROLE: 'parent' | 'teacher' = 'teacher'; // <-- SWITCH HERE TO TEST TEACHER FLOW
-
-export const MOCK_LOGGED_IN_USER = MOCK_USER_ROLE === 'parent' ? PARENT_MOCK_USER : TEACHER_MOCK_USER;
+// MOCK_LOGGED_IN_USER and MOCK_USER_ROLE are removed.
+// The active user will be managed by UserRoleContext.
 
 // --- CLASSES ---
 export const MOCK_CLASSES: SchoolClass[] = [
@@ -35,9 +32,9 @@ export const MOCK_CLASSES: SchoolClass[] = [
 
 // --- CHILDREN ---
 export const MOCK_CHILDREN: Child[] = [
-  { id: 'child1', name: 'Alex Johnson', avatarUrl: 'https://picsum.photos/100/100?random=1', dataAiHint: "child boy", currentAttendanceStatus: 'Present', absenceCountThisMonth: 1, gradeLevel: 'Grade 5', classId: 'classGrade5A' },
-  { id: 'child2', name: 'Mia Williams', avatarUrl: 'https://picsum.photos/100/100?random=2', dataAiHint: "child girl", currentAttendanceStatus: 'Absent', absenceCountThisMonth: 3, gradeLevel: 'Grade 3', classId: 'classGrade3B' },
-  { id: 'child3', name: 'Ethan Brown', avatarUrl: 'https://picsum.photos/100/100?random=3', dataAiHint: "child student", currentAttendanceStatus: 'Present', absenceCountThisMonth: 0, gradeLevel: 'Grade 5', classId: 'classGrade5A' }, // Ethan also in Grade 5A for Mr. Smith
+  { id: 'child1', name: 'Alex Johnson', avatarUrl: 'https://picsum.photos/100/100?random=1', dataAiHint: "child boy", currentAttendanceStatus: 'Present', absenceCountThisMonth: 1, gradeLevel: 'Grade 5', classId: 'classGrade5A', parentUid: PARENT_MOCK_USER.id },
+  { id: 'child2', name: 'Mia Williams', avatarUrl: 'https://picsum.photos/100/100?random=2', dataAiHint: "child girl", currentAttendanceStatus: 'Absent', absenceCountThisMonth: 3, gradeLevel: 'Grade 3', classId: 'classGrade3B', parentUid: PARENT_MOCK_USER.id },
+  { id: 'child3', name: 'Ethan Brown', avatarUrl: 'https://picsum.photos/100/100?random=3', dataAiHint: "child student", currentAttendanceStatus: 'Present', absenceCountThisMonth: 0, gradeLevel: 'Grade 5', classId: 'classGrade5A', parentUid: PARENT_MOCK_USER.id },
 ];
 
 // --- SUBJECTS ---
@@ -92,15 +89,15 @@ export const MOCK_ASSIGNMENT_SUBMISSIONS: AssignmentSubmission[] = [
 
 // --- GRADE REPORTS ---
 export const getMockGradeReports = (studentId: string): GradeReportEntry[] => [
-  { id: 'gr1', studentId, subjectId: 'subjMath5', grade: 'A', teacherFeedback: 'Excellent understanding of concepts. Keep up the great work!', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
-  { id: 'gr2', studentId, subjectId: 'subjSci5', grade: 'B+', teacherFeedback: 'Good effort, needs to focus more on practical applications.', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
+  { id: 'gr1', studentId, subjectId: 'subjMath5', subject: 'Mathematics - Grade 5', grade: 'A', teacherFeedback: 'Excellent understanding of concepts. Keep up the great work!', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
+  { id: 'gr2', studentId, subjectId: 'subjSci5', subject: 'Science - Grade 5', grade: 'B+', teacherFeedback: 'Good effort, needs to focus more on practical applications.', term: 'Term 1', issuedBy: TEACHER_MOCK_USER.id },
 ].filter(gr => MOCK_CHILDREN.find(c => c.id === studentId && c.classId === MOCK_SUBJECTS.find(s => s.id === gr.subjectId)?.classId)); // Basic filter
 
 
 // --- MESSAGES & CONVERSATIONS ---
 const mockTeacher1 = TEACHER_MOCK_USER; // Use Mr. Smith
-const mockTeacher2 = { id: 'userTeacherABC', name: 'Ms. Eva Green (Eng Grade 3)', avatarUrl: 'https://picsum.photos/100/100?random=teacher2', dataAiHint: "teacher woman", role: 'teacher' as const };
-const mockSchoolOffice = { id: 'schoolOffice', name: 'School Office', avatarUrl: 'https://picsum.photos/100/100?random=office', dataAiHint: "building entrance", role: 'teacher' as const }; // Role could be 'admin' or similar
+const mockTeacher2 = { id: 'userTeacherABC', name: 'Ms. Eva Green (Eng Grade 3)', avatarUrl: 'https://picsum.photos/100/100?random=teacher2', dataAiHint: "teacher woman", role: 'teacher' as const, email: 'eva.green@example.com' };
+const mockSchoolOffice = { id: 'schoolOffice', name: 'School Office', avatarUrl: 'https://picsum.photos/100/100?random=office', dataAiHint: "building entrance", role: 'teacher' as const, email: 'office@example.com' }; // Role could be 'admin' or similar
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
   {
@@ -112,7 +109,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
     },
     lastMessagePreview: 'Yes, Alex can get an extension on the homework.',
     lastMessageTimestamp: subDays(new Date(),1).toISOString(),
-    unreadCounts: { [PARENT_MOCK_USER.id]: 1 },
+    unreadCounts: { [PARENT_MOCK_USER.id]: 1, [mockTeacher1.id]: 0 },
     messages: [
       { id: 'msg1', conversationId: 'convParentTeacher1', senderId: mockTeacher1.id, senderName: mockTeacher1.name, avatarUrl: mockTeacher1.avatarUrl, dataAiHint: mockTeacher1.dataAiHint, timestamp: subDays(new Date(),1).toISOString(), text: 'Hello, I wanted to discuss Alex\'s progress.', isOwnMessage: false },
       { id: 'msg2', conversationId: 'convParentTeacher1', senderId: PARENT_MOCK_USER.id, senderName: PARENT_MOCK_USER.name, avatarUrl: PARENT_MOCK_USER.avatarUrl, dataAiHint: PARENT_MOCK_USER.dataAiHint, timestamp: subDays(new Date(),1).toISOString(), text: 'Hi Mr. Smith, sure. Also, could Alex get an extension for the math homework due tomorrow?', isOwnMessage: true },
@@ -175,4 +172,9 @@ export const getMockAssignmentSubmissionsForAssignment = (assignmentId: string):
 
 export const getMockAssignmentSubmissionsForStudent = (studentId: string, assignmentId: string): AssignmentSubmission | undefined => {
     return MOCK_ASSIGNMENT_SUBMISSIONS.find(s => s.studentId === studentId && s.assignmentId === assignmentId);
+};
+
+// Function to get children for a specific parent UID
+export const getChildrenForParentUID = (parentUid: string): Child[] => {
+  return MOCK_CHILDREN.filter(child => child.parentUid === parentUid);
 };
