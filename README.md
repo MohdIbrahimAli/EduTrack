@@ -1,6 +1,5 @@
 # 3 Idiots
 
-This is a NextJS starter in Firebase Studio.
 
 To get started, take a look at src/app/page.tsx.
 This is made by team 3 Idiots, We were given SDG 4 : Quality Education Problem no 5: Build a school attendance tracker for parents.
