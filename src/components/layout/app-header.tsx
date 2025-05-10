@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MOCK_USER } from '@/lib/placeholder-data';
+import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data'; // Use the dynamic logged-in user
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'; 
 import { useRouter } from 'next/navigation';
 
@@ -51,6 +51,7 @@ export function AppHeader({ title, children }: AppHeaderProps) {
 
 function UserMenu() {
   const router = useRouter();
+  const user = MOCK_LOGGED_IN_USER; // Use the dynamic logged-in user
 
   const handleLogout = () => {
     // In a real app, this would call an auth service to sign out
@@ -63,13 +64,13 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={MOCK_USER.avatarUrl} alt={MOCK_USER.name} data-ai-hint={MOCK_USER.dataAiHint}/>
-            <AvatarFallback>{MOCK_USER.name.substring(0, 1)}</AvatarFallback>
+            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint}/>
+            <AvatarFallback>{user.name ? user.name.substring(0, 1) : 'U'}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{MOCK_USER.name}</DropdownMenuLabel>
+        <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <Link href="/profile" passHref>
           <DropdownMenuItem asChild>

@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState } from 'react';
 import type { Conversation, Message } from '@/types';
-import { MOCK_USER } from '@/lib/placeholder-data';
+import { MOCK_LOGGED_IN_USER } from '@/lib/placeholder-data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, UserCircle, MessageSquareDashed } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge'; // Added import for Badge
+import { Badge } from '@/components/ui/badge'; 
 
 interface ChatInterfaceProps {
   initialConversations: Conversation[];
@@ -25,6 +26,7 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
   const [newMessage, setNewMessage] = useState('');
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+  const currentUser = MOCK_LOGGED_IN_USER;
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,22 +34,29 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
 
     const message: Message = {
       id: `msg-${Date.now()}`,
-      senderId: MOCK_USER.id,
-      senderName: MOCK_USER.name,
-      avatarUrl: MOCK_USER.avatarUrl,
-      dataAiHint: MOCK_USER.dataAiHint,
+      conversationId: selectedConversation.id,
+      senderId: currentUser.id,
+      senderName: currentUser.name || "User",
+      avatarUrl: currentUser.avatarUrl,
+      dataAiHint: currentUser.dataAiHint,
       timestamp: new Date().toISOString(),
       text: newMessage.trim(),
-      isOwnMessage: true,
+      isOwnMessage: true, // This will be true for the sender
     };
 
     const updatedConversations = conversations.map(conv => {
       if (conv.id === selectedConversationId) {
+        const updatedMessages = [...conv.messages, message];
         return {
           ...conv,
-          messages: [...conv.messages, message],
+          messages: updatedMessages,
           lastMessagePreview: message.text,
           lastMessageTimestamp: message.timestamp,
+          // Reset unread count for the current user if they are sending a message in this convo
+          unreadCounts: {
+            ...(conv.unreadCounts || {}),
+            [currentUser.id]: 0,
+          }
         };
       }
       return conv;
@@ -56,6 +65,12 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
     setNewMessage('');
     // In a real app, this would also send the message to the backend
   };
+  
+  const getOtherParticipantDetails = (conv: Conversation) => {
+    const otherParticipantId = conv.participantIds.find(id => id !== currentUser.id);
+    return otherParticipantId ? conv.participantDetails[otherParticipantId] : { name: "Unknown Contact", avatarUrl: undefined };
+  };
+
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-12rem)] md:h-[calc(100vh-8rem)] border rounded-lg shadow-lg overflow-hidden bg-card">
@@ -65,29 +80,33 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
           <CardTitle className="text-lg font-semibold text-primary">Conversations</CardTitle>
         </CardHeader>
         <ScrollArea className="h-[calc(100%-4rem)] p-2">
-          {conversations.map(conv => (
-            <Button
-              key={conv.id}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start h-auto p-3 mb-1 rounded-md text-left",
-                selectedConversationId === conv.id && "bg-accent text-accent-foreground"
-              )}
-              onClick={() => setSelectedConversationId(conv.id)}
-            >
-              <Avatar className="h-10 w-10 mr-3">
-                <AvatarImage src={conv.teacherAvatarUrl} alt={conv.teacherName} data-ai-hint={conv.dataAiHint || "teacher portrait"} />
-                <AvatarFallback>{conv.teacherName.substring(0, 1)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-grow overflow-hidden">
-                <p className="font-semibold truncate">{conv.teacherName}</p>
-                <p className="text-xs text-muted-foreground truncate">{conv.lastMessagePreview}</p>
-              </div>
-              {conv.unreadCount > 0 && (
-                <Badge variant="destructive" className="ml-auto shrink-0">{conv.unreadCount}</Badge>
-              )}
-            </Button>
-          ))}
+          {conversations.map(conv => {
+            const contactDetails = getOtherParticipantDetails(conv);
+            const unreadCountForCurrentUser = conv.unreadCounts ? conv.unreadCounts[currentUser.id] || 0 : 0;
+            return (
+                <Button
+                key={conv.id}
+                variant="ghost"
+                className={cn(
+                    "w-full justify-start h-auto p-3 mb-1 rounded-md text-left",
+                    selectedConversationId === conv.id && "bg-accent text-accent-foreground"
+                )}
+                onClick={() => setSelectedConversationId(conv.id)}
+                >
+                <Avatar className="h-10 w-10 mr-3">
+                    <AvatarImage src={contactDetails.avatarUrl} alt={contactDetails.name} data-ai-hint={contactDetails.name.split(' ')[0] || "person"} />
+                    <AvatarFallback>{contactDetails.name.substring(0, 1)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-grow overflow-hidden">
+                    <p className="font-semibold truncate">{contactDetails.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{conv.lastMessagePreview}</p>
+                </div>
+                {unreadCountForCurrentUser > 0 && (
+                    <Badge variant="destructive" className="ml-auto shrink-0">{unreadCountForCurrentUser}</Badge>
+                )}
+                </Button>
+            );
+        })}
         </ScrollArea>
       </div>
 
@@ -97,45 +116,48 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
           <>
             <CardHeader className="p-4 border-b flex-row items-center gap-3">
                <Avatar className="h-10 w-10">
-                <AvatarImage src={selectedConversation.teacherAvatarUrl} alt={selectedConversation.teacherName} data-ai-hint={selectedConversation.dataAiHint || "teacher portrait"}/>
-                <AvatarFallback>{selectedConversation.teacherName.substring(0,1)}</AvatarFallback>
+                <AvatarImage src={getOtherParticipantDetails(selectedConversation).avatarUrl} alt={getOtherParticipantDetails(selectedConversation).name} data-ai-hint={getOtherParticipantDetails(selectedConversation).name.split(' ')[0] || "person"}/>
+                <AvatarFallback>{getOtherParticipantDetails(selectedConversation).name.substring(0,1)}</AvatarFallback>
               </Avatar>
               <div>
-                <CardTitle className="text-lg font-semibold text-primary">{selectedConversation.teacherName}</CardTitle>
+                <CardTitle className="text-lg font-semibold text-primary">{getOtherParticipantDetails(selectedConversation).name}</CardTitle>
                 <p className="text-xs text-muted-foreground">Last active: {format(parseISO(selectedConversation.lastMessageTimestamp), "PPp")}</p>
               </div>
             </CardHeader>
             <ScrollArea className="flex-grow p-4 space-y-4 bg-background/30">
-              {selectedConversation.messages.map(msg => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex items-end gap-2 max-w-[75%]",
-                    msg.isOwnMessage ? "ml-auto flex-row-reverse" : "mr-auto"
-                  )}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={msg.avatarUrl} alt={msg.senderName} data-ai-hint={msg.dataAiHint || "person"} />
-                    <AvatarFallback>{msg.senderName.substring(0, 1)}</AvatarFallback>
-                  </Avatar>
-                  <div
+              {selectedConversation.messages.map(msg => {
+                const isOwn = msg.senderId === currentUser.id;
+                return (
+                    <div
+                    key={msg.id}
                     className={cn(
-                      "p-3 rounded-lg shadow",
-                      msg.isOwnMessage
-                        ? "bg-primary text-primary-foreground rounded-br-none"
-                        : "bg-secondary text-secondary-foreground rounded-bl-none"
+                        "flex items-end gap-2 max-w-[75%]",
+                        isOwn ? "ml-auto flex-row-reverse" : "mr-auto"
                     )}
-                  >
-                    <p className="text-sm">{msg.text}</p>
-                    <p className={cn(
-                        "text-xs mt-1",
-                        msg.isOwnMessage ? "text-primary-foreground/70 text-right" : "text-muted-foreground/70 text-left"
-                    )}>
-                      {format(parseISO(msg.timestamp), "p")}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                    >
+                    <Avatar className="h-8 w-8">
+                        <AvatarImage src={msg.avatarUrl} alt={msg.senderName} data-ai-hint={msg.dataAiHint || "person"} />
+                        <AvatarFallback>{msg.senderName.substring(0, 1)}</AvatarFallback>
+                    </Avatar>
+                    <div
+                        className={cn(
+                        "p-3 rounded-lg shadow",
+                        isOwn
+                            ? "bg-primary text-primary-foreground rounded-br-none"
+                            : "bg-secondary text-secondary-foreground rounded-bl-none"
+                        )}
+                    >
+                        <p className="text-sm">{msg.text}</p>
+                        <p className={cn(
+                            "text-xs mt-1",
+                            isOwn ? "text-primary-foreground/70 text-right" : "text-muted-foreground/70 text-left"
+                        )}>
+                        {format(parseISO(msg.timestamp), "p")}
+                        </p>
+                    </div>
+                    </div>
+                );
+            })}
             </ScrollArea>
             <form onSubmit={handleSendMessage} className="p-4 border-t flex items-center gap-2 bg-card">
               <Input
@@ -153,7 +175,7 @@ export function ChatInterface({ initialConversations }: ChatInterfaceProps) {
           <div className="flex-grow flex flex-col items-center justify-center text-center p-8 bg-background/30">
             <MessageSquareDashed className="h-24 w-24 text-muted-foreground/50 mb-4" />
             <h3 className="text-xl font-semibold text-muted-foreground">Select a conversation</h3>
-            <p className="text-sm text-muted-foreground">Choose a teacher from the list to start chatting.</p>
+            <p className="text-sm text-muted-foreground">Choose a contact from the list to start chatting.</p>
           </div>
         )}
       </div>

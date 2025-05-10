@@ -1,4 +1,5 @@
-import { getMockSubjects, getMockChildById } from "@/lib/placeholder-data";
+
+import { getMockSubjectsForChild, getMockChildById } from "@/lib/placeholder-data";
 import { SubjectProgressCard } from "@/components/syllabus/subject-progress-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UserX } from "lucide-react";
@@ -20,7 +21,7 @@ export default function SyllabusPage({ params }: { params: { childId: string } }
     );
   }
   
-  const subjects = getMockSubjects(params.childId);
+  const subjects = getMockSubjectsForChild(params.childId);
 
   return (
     <div className="container mx-auto py-8">
@@ -39,3 +40,4 @@ export default function SyllabusPage({ params }: { params: { childId: string } }
     </div>
   );
 }
+

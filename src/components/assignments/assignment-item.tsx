@@ -1,4 +1,5 @@
-import type { Assignment } from '@/types';
+
+import type { ChildAssignmentView } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +7,7 @@ import { CalendarDays, CheckCircle, Send, AlertCircle } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 
 interface AssignmentItemProps {
-  assignment: Assignment;
+  assignment: ChildAssignmentView;
 }
 
 export function AssignmentItem({ assignment }: AssignmentItemProps) {
@@ -19,7 +20,7 @@ export function AssignmentItem({ assignment }: AssignmentItemProps) {
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="text-lg font-semibold text-primary">{assignment.title}</CardTitle>
-            <CardDescription className="text-xs text-muted-foreground">{assignment.subject}</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">{assignment.subjectName}</CardDescription>
           </div>
           {assignment.submitted ? (
             <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white">

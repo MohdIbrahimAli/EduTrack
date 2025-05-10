@@ -1,4 +1,6 @@
-import { getMockAssignments, getMockChildById } from "@/lib/placeholder-data";
+
+import { getMockAssignmentsForChild, getMockChildById } from "@/lib/placeholder-data";
+import type { ChildAssignmentView } from "@/types";
 import { AssignmentItem } from "@/components/assignments/assignment-item";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,7 +23,8 @@ export default function AssignmentsPage({ params }: { params: { childId: string 
     );
   }
 
-  const allAssignments = getMockAssignments(params.childId);
+  const allAssignments: ChildAssignmentView[] = getMockAssignmentsForChild(params.childId);
+  
   const upcomingAssignments = allAssignments.filter(a => !a.submitted && new Date(a.dueDate) >= new Date());
   const pastAssignments = allAssignments.filter(a => a.submitted || new Date(a.dueDate) < new Date());
 
@@ -34,7 +37,7 @@ export default function AssignmentsPage({ params }: { params: { childId: string 
       <Tabs defaultValue="upcoming" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6 rounded-lg">
           <TabsTrigger value="upcoming" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Upcoming</TabsTrigger>
-          <TabsTrigger value="past" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Past & Submitted</TabsTrigger>
+          <TabsTrigger value="past" className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Past &amp; Submitted</TabsTrigger>
         </TabsList>
         <TabsContent value="upcoming">
           {upcomingAssignments.length > 0 ? (
