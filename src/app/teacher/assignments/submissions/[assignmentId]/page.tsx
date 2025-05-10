@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, use } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MOCK_CLASSES, getMockChildById, getMockAssignmentsForClass, getMockAssignmentSubmissionsForAssignment, MOCK_SUBJECTS, addOrUpdateMockAssignmentSubmission } from '@/lib/placeholder-data';
@@ -34,7 +35,10 @@ async function saveGradeAndFeedback(submissionData: Partial<AssignmentSubmission
 }
 
 
-export default function TeacherViewSubmissionsPage({ params }: { params: { assignmentId: string } }) {
+export default function TeacherViewSubmissionsPage({ params: paramsPromise }: { params: { assignmentId: string } }) {
+  const params = use(paramsPromise);
+  const { assignmentId: resolvedAssignmentId } = params;
+
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const classId = searchParams.get('classId');
@@ -64,7 +68,7 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
       const foundClass = MOCK_CLASSES.find(c => c.id === classId && c.teacherId === context.currentUser!.id);
       setSchoolClass(foundClass);
       if (foundClass) {
-        const foundAssignment = getMockAssignmentsForClass(foundClass.id).find(a => a.id === params.assignmentId);
+        const foundAssignment = getMockAssignmentsForClass(foundClass.id).find(a => a.id === resolvedAssignmentId);
         setAssignment(foundAssignment || null);
         if (foundAssignment) {
           fetchSubmissions(); // Initial fetch
@@ -76,7 +80,7 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
     } else if (context && !context.isLoadingRole) {
       setIsLoadingPage(false);
     }
-  }, [context, params.assignmentId, classId, assignment?.id]); // Added assignment?.id to re-fetch if assignment changes
+  }, [context, resolvedAssignmentId, classId, assignment?.id]); // Added assignment?.id to re-fetch if assignment changes
 
   if (!context || context.isLoadingRole || isLoadingPage) {
      return (
@@ -216,3 +220,5 @@ export default function TeacherViewSubmissionsPage({ params }: { params: { assig
     </div>
   );
 }
+
+    
