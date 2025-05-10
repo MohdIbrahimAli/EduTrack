@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, UserCircle, MessageSquareDashed } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge'; // Added import for Badge
 
 interface ChatInterfaceProps {
   initialConversations: Conversation[];
