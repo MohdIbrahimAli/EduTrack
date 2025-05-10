@@ -1,8 +1,9 @@
+
+'use client';
 import type { ReactNode } from 'react';
 import { Bell, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -13,7 +14,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MOCK_USER } from '@/lib/placeholder-data';
-import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'; // Import SidebarTrigger and useSidebar
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'; 
+import { useRouter } from 'next/navigation';
+
 
 interface AppHeaderProps {
   title?: string;
@@ -21,7 +24,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ title, children }: AppHeaderProps) {
-  const { isMobile } = useSidebar(); // Get isMobile from useSidebar context
+  const { isMobile } = useSidebar(); 
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -47,6 +50,14 @@ export function AppHeader({ title, children }: AppHeaderProps) {
 }
 
 function UserMenu() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // In a real app, this would call an auth service to sign out
+    // For now, redirect to a conceptual login/home page
+    router.push('/'); 
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -60,10 +71,18 @@ function UserMenu() {
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>{MOCK_USER.name}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>Profile</DropdownMenuItem>
-        <DropdownMenuItem>Settings</DropdownMenuItem>
+        <Link href="/profile" passHref>
+          <DropdownMenuItem asChild>
+            <a>Profile</a>
+          </DropdownMenuItem>
+        </Link>
+        <Link href="/settings" passHref>
+          <DropdownMenuItem asChild>
+            <a>Settings</a>
+          </DropdownMenuItem>
+        </Link>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>Logout</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

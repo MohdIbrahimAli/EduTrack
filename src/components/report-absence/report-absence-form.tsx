@@ -1,7 +1,9 @@
+
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +14,7 @@ import { handleGenerateAbsenceReport, ReportAbsenceFormState } from '@/app/(app)
 import { MOCK_CHILDREN } from '@/lib/placeholder-data';
 import type { Child } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Copy, Check, Send, Sparkles, Loader2 } from 'lucide-react';
+import { Copy, Check, MessageSquarePlus, Sparkles, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -38,6 +40,7 @@ export function ReportAbsenceForm() {
   const [selectedChild, setSelectedChild] = useState<Child | undefined>(undefined);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const { toast } = useToast();
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -56,12 +59,20 @@ export function ReportAbsenceForm() {
     }
   }, [state, toast]);
 
-  const handleCopyToClipboard = () => {
-    if (state.generatedReport?.notificationText) {
-      navigator.clipboard.writeText(state.generatedReport.notificationText);
+  const handleCopyToClipboard = (textToCopy: string | undefined) => {
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       toast({ title: "Copied to clipboard!" });
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  
+  const handleCopyAndGoToMessages = () => {
+    if (state.generatedReport?.notificationText) {
+      handleCopyToClipboard(state.generatedReport.notificationText);
+      // Navigate to messages page. The user can then paste the copied text.
+      router.push('/messages');
     }
   };
 
@@ -161,7 +172,7 @@ export function ReportAbsenceForm() {
         <Card className="mt-8 shadow-xl rounded-lg">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-primary">Generated Notification</CardTitle>
-            <CardDescription>Review the AI-generated text below. You can copy it or send it directly.</CardDescription>
+            <CardDescription>Review the AI-generated text. You can copy it or proceed to messages.</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -172,13 +183,13 @@ export function ReportAbsenceForm() {
             />
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={handleCopyToClipboard} variant="outline" className="w-full sm:w-auto">
+            <Button onClick={() => handleCopyToClipboard(state.generatedReport?.notificationText)} variant="outline" className="w-full sm:w-auto">
               {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
               {copied ? 'Copied!' : 'Copy Text'}
             </Button>
-            <Button disabled className="w-full sm:w-auto"> {/* Send functionality not implemented */}
-              <Send className="mr-2 h-4 w-4" />
-              Send Notification (Coming Soon)
+            <Button onClick={handleCopyAndGoToMessages} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
+              <MessageSquarePlus className="mr-2 h-4 w-4" />
+              Copy & Go to Messages
             </Button>
           </CardFooter>
         </Card>

@@ -1,3 +1,4 @@
+
 export interface Child {
   id: string;
   name: string;
@@ -6,6 +7,14 @@ export interface Child {
   currentAttendanceStatus?: 'Present' | 'Absent' | 'Late';
   absenceCountThisMonth?: number;
   gradeLevel?: string;
+}
+
+export interface User { // Added User interface based on MOCK_USER
+  id: string;
+  name: string;
+  email?: string; // Optional email
+  avatarUrl?: string;
+  dataAiHint?: string;
 }
 
 export interface AttendanceRecord {
@@ -64,7 +73,7 @@ export interface Message {
 
 export interface Conversation {
     id: string;
-    teacherId: string;
+    teacherId: string; // Can also be a generic ID like 'schoolOffice'
     teacherName: string;
     teacherAvatarUrl?: string;
     dataAiHint?: string;

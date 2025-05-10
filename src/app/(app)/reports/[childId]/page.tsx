@@ -1,7 +1,9 @@
+
 import { getMockGradeReports, getMockChildById } from "@/lib/placeholder-data";
 import { GradeOverview } from "@/components/reports/grade-overview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UserX } from "lucide-react";
+import { AcademicAdvisorSection } from "@/components/reports/academic-advisor-section"; // Added import
 
 export default function ReportsPage({ params }: { params: { childId: string } }) {
   const child = getMockChildById(params.childId);
@@ -36,6 +38,9 @@ export default function ReportsPage({ params }: { params: { childId: string } })
       ) : (
         <p className="text-muted-foreground text-center py-8">No progress reports available for {child.name}.</p>
       )}
+
+      {/* AI Academic Advisor Section */}
+      <AcademicAdvisorSection childId={child.id} childName={child.name} />
     </div>
   );
 }
